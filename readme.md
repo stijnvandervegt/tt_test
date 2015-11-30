@@ -9,7 +9,7 @@ Om het project te installeren is het belangrijk de volgende taken uit te voeren:
 * `gulp`
 
 ## Database
-De database instellingen kunnen in de .env file gezet worden. De .env file moet in de root folder van de applicatei komen en je kunt een voorbeeld kopieren van de .env.example file. 
+De database instellingen kunnen in de .env file gezet worden. De .env file moet in de root folder van de applicatie komen, je kunt een voorbeeld kopieren van de .env.example file. 
 Nadat de database ingesteld is kun je `php artisan migrate` uitvoeren om alle tables in de database te zetten.
 
 ## Server
