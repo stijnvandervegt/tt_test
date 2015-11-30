@@ -1,0 +1,5 @@
+suites:
+    main:
+        namespace: TamTam
+        psr4_prefix: TamTam
+        src_path: app

@@ -1,0 +1,12 @@
+.svg-background-image(@svg,@fallback){
+	background-image: url('@{fallback}');
+	background-image: url('@{svg}'), none;
+}
+
+.background-cover(@img) {
+	background: url(@img) no-repeat center center fixed;
+	-webkit-background-size: cover;
+	-moz-background-size: cover;
+	-o-background-size: cover;
+	background-size: cover;
+}
