@@ -31,7 +31,7 @@ class ContactForm
     {
 
         $job = new MailContactForm($event);
-        $this->dispatch($job);
+        return $this->dispatch($job);
 
     }
 }

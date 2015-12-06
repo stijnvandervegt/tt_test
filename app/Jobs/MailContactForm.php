@@ -5,7 +5,8 @@ namespace TamTam\Jobs;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Bus\SelfHandling;
-use Mail;
+use Illuminate\Support\Facades\Mail;
+
 use TamTam\ContactForm;
 
 class MailContactForm extends Job implements SelfHandling, ShouldQueue
@@ -29,7 +30,7 @@ class MailContactForm extends Job implements SelfHandling, ShouldQueue
     /**
      * Execute the job.
      *
-     * @param Mail $mail
+     * @internal param Mail $mail
      */
     public function handle() {
 
