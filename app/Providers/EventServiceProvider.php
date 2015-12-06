@@ -16,6 +16,9 @@ class EventServiceProvider extends ServiceProvider
         'TamTam\Events\ContactFormWasSaved' => [
             'TamTam\Listeners\ContactForm@send',
         ],
+        'TamTam\Events\FeedWasFetched' => [
+            'TamTam\Listeners\SaveFeed@file',
+        ],
     ];
 
     /**

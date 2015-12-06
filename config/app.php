@@ -144,6 +144,7 @@ return [
         TamTam\Providers\AuthServiceProvider::class,
         TamTam\Providers\EventServiceProvider::class,
         TamTam\Providers\RouteServiceProvider::class,
+        Vinkla\Instagram\InstagramServiceProvider::class
 
     ],
 
@@ -193,6 +194,7 @@ return [
         'URL'       => Illuminate\Support\Facades\URL::class,
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View'      => Illuminate\Support\Facades\View::class,
+        'Instagram' => Vinkla\Instagram\Facades\Instagram::class
 
     ],
 
