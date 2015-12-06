@@ -37,7 +37,7 @@ class MailContactForm extends Job implements SelfHandling, ShouldQueue
         $emailFrom = $this->contactForm->email;
         Mail::send('emails.contact', ['form' => $this->contactForm], function($message) use($emailFrom) {
             $message->from($emailFrom, 'Contact Form TamTam');
-            $message->to('stijn@draad.nu');
+            $message->to(env('ADMIN_EMAIL'));
         });
 
     }
