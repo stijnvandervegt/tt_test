@@ -9304,6 +9304,5213 @@ process.chdir = function (dir) {
 process.umask = function() { return 0; };
 
 },{}],3:[function(require,module,exports){
+/*
+     _ _      _       _
+ ___| (_) ___| | __  (_)___
+/ __| | |/ __| |/ /  | / __|
+\__ \ | | (__|   < _ | \__ \
+|___/_|_|\___|_|\_(_)/ |___/
+                   |__/
+
+ Version: 1.5.9
+  Author: Ken Wheeler
+ Website: http://kenwheeler.github.io
+    Docs: http://kenwheeler.github.io/slick
+    Repo: http://github.com/kenwheeler/slick
+  Issues: http://github.com/kenwheeler/slick/issues
+
+ */
+/* global window, document, define, jQuery, setInterval, clearInterval */
+(function(factory) {
+    'use strict';
+    if (typeof define === 'function' && define.amd) {
+        define(['jquery'], factory);
+    } else if (typeof exports !== 'undefined') {
+        module.exports = factory(require('jquery'));
+    } else {
+        factory(jQuery);
+    }
+
+}(function($) {
+    'use strict';
+    var Slick = window.Slick || {};
+
+    Slick = (function() {
+
+        var instanceUid = 0;
+
+        function Slick(element, settings) {
+
+            var _ = this, dataSettings;
+
+            _.defaults = {
+                accessibility: true,
+                adaptiveHeight: false,
+                appendArrows: $(element),
+                appendDots: $(element),
+                arrows: true,
+                asNavFor: null,
+                prevArrow: '<button type="button" data-role="none" class="slick-prev" aria-label="Previous" tabindex="0" role="button">Previous</button>',
+                nextArrow: '<button type="button" data-role="none" class="slick-next" aria-label="Next" tabindex="0" role="button">Next</button>',
+                autoplay: false,
+                autoplaySpeed: 3000,
+                centerMode: false,
+                centerPadding: '50px',
+                cssEase: 'ease',
+                customPaging: function(slider, i) {
+                    return '<button type="button" data-role="none" role="button" aria-required="false" tabindex="0">' + (i + 1) + '</button>';
+                },
+                dots: false,
+                dotsClass: 'slick-dots',
+                draggable: true,
+                easing: 'linear',
+                edgeFriction: 0.35,
+                fade: false,
+                focusOnSelect: false,
+                infinite: true,
+                initialSlide: 0,
+                lazyLoad: 'ondemand',
+                mobileFirst: false,
+                pauseOnHover: true,
+                pauseOnDotsHover: false,
+                respondTo: 'window',
+                responsive: null,
+                rows: 1,
+                rtl: false,
+                slide: '',
+                slidesPerRow: 1,
+                slidesToShow: 1,
+                slidesToScroll: 1,
+                speed: 500,
+                swipe: true,
+                swipeToSlide: false,
+                touchMove: true,
+                touchThreshold: 5,
+                useCSS: true,
+                useTransform: false,
+                variableWidth: false,
+                vertical: false,
+                verticalSwiping: false,
+                waitForAnimate: true,
+                zIndex: 1000
+            };
+
+            _.initials = {
+                animating: false,
+                dragging: false,
+                autoPlayTimer: null,
+                currentDirection: 0,
+                currentLeft: null,
+                currentSlide: 0,
+                direction: 1,
+                $dots: null,
+                listWidth: null,
+                listHeight: null,
+                loadIndex: 0,
+                $nextArrow: null,
+                $prevArrow: null,
+                slideCount: null,
+                slideWidth: null,
+                $slideTrack: null,
+                $slides: null,
+                sliding: false,
+                slideOffset: 0,
+                swipeLeft: null,
+                $list: null,
+                touchObject: {},
+                transformsEnabled: false,
+                unslicked: false
+            };
+
+            $.extend(_, _.initials);
+
+            _.activeBreakpoint = null;
+            _.animType = null;
+            _.animProp = null;
+            _.breakpoints = [];
+            _.breakpointSettings = [];
+            _.cssTransitions = false;
+            _.hidden = 'hidden';
+            _.paused = false;
+            _.positionProp = null;
+            _.respondTo = null;
+            _.rowCount = 1;
+            _.shouldClick = true;
+            _.$slider = $(element);
+            _.$slidesCache = null;
+            _.transformType = null;
+            _.transitionType = null;
+            _.visibilityChange = 'visibilitychange';
+            _.windowWidth = 0;
+            _.windowTimer = null;
+
+            dataSettings = $(element).data('slick') || {};
+
+            _.options = $.extend({}, _.defaults, dataSettings, settings);
+
+            _.currentSlide = _.options.initialSlide;
+
+            _.originalSettings = _.options;
+
+            if (typeof document.mozHidden !== 'undefined') {
+                _.hidden = 'mozHidden';
+                _.visibilityChange = 'mozvisibilitychange';
+            } else if (typeof document.webkitHidden !== 'undefined') {
+                _.hidden = 'webkitHidden';
+                _.visibilityChange = 'webkitvisibilitychange';
+            }
+
+            _.autoPlay = $.proxy(_.autoPlay, _);
+            _.autoPlayClear = $.proxy(_.autoPlayClear, _);
+            _.changeSlide = $.proxy(_.changeSlide, _);
+            _.clickHandler = $.proxy(_.clickHandler, _);
+            _.selectHandler = $.proxy(_.selectHandler, _);
+            _.setPosition = $.proxy(_.setPosition, _);
+            _.swipeHandler = $.proxy(_.swipeHandler, _);
+            _.dragHandler = $.proxy(_.dragHandler, _);
+            _.keyHandler = $.proxy(_.keyHandler, _);
+            _.autoPlayIterator = $.proxy(_.autoPlayIterator, _);
+
+            _.instanceUid = instanceUid++;
+
+            // A simple way to check for HTML strings
+            // Strict HTML recognition (must start with <)
+            // Extracted from jQuery v1.11 source
+            _.htmlExpr = /^(?:\s*(<[\w\W]+>)[^>]*)$/;
+
+
+            _.registerBreakpoints();
+            _.init(true);
+            _.checkResponsive(true);
+
+        }
+
+        return Slick;
+
+    }());
+
+    Slick.prototype.addSlide = Slick.prototype.slickAdd = function(markup, index, addBefore) {
+
+        var _ = this;
+
+        if (typeof(index) === 'boolean') {
+            addBefore = index;
+            index = null;
+        } else if (index < 0 || (index >= _.slideCount)) {
+            return false;
+        }
+
+        _.unload();
+
+        if (typeof(index) === 'number') {
+            if (index === 0 && _.$slides.length === 0) {
+                $(markup).appendTo(_.$slideTrack);
+            } else if (addBefore) {
+                $(markup).insertBefore(_.$slides.eq(index));
+            } else {
+                $(markup).insertAfter(_.$slides.eq(index));
+            }
+        } else {
+            if (addBefore === true) {
+                $(markup).prependTo(_.$slideTrack);
+            } else {
+                $(markup).appendTo(_.$slideTrack);
+            }
+        }
+
+        _.$slides = _.$slideTrack.children(this.options.slide);
+
+        _.$slideTrack.children(this.options.slide).detach();
+
+        _.$slideTrack.append(_.$slides);
+
+        _.$slides.each(function(index, element) {
+            $(element).attr('data-slick-index', index);
+        });
+
+        _.$slidesCache = _.$slides;
+
+        _.reinit();
+
+    };
+
+    Slick.prototype.animateHeight = function() {
+        var _ = this;
+        if (_.options.slidesToShow === 1 && _.options.adaptiveHeight === true && _.options.vertical === false) {
+            var targetHeight = _.$slides.eq(_.currentSlide).outerHeight(true);
+            _.$list.animate({
+                height: targetHeight
+            }, _.options.speed);
+        }
+    };
+
+    Slick.prototype.animateSlide = function(targetLeft, callback) {
+
+        var animProps = {},
+            _ = this;
+
+        _.animateHeight();
+
+        if (_.options.rtl === true && _.options.vertical === false) {
+            targetLeft = -targetLeft;
+        }
+        if (_.transformsEnabled === false) {
+            if (_.options.vertical === false) {
+                _.$slideTrack.animate({
+                    left: targetLeft
+                }, _.options.speed, _.options.easing, callback);
+            } else {
+                _.$slideTrack.animate({
+                    top: targetLeft
+                }, _.options.speed, _.options.easing, callback);
+            }
+
+        } else {
+
+            if (_.cssTransitions === false) {
+                if (_.options.rtl === true) {
+                    _.currentLeft = -(_.currentLeft);
+                }
+                $({
+                    animStart: _.currentLeft
+                }).animate({
+                    animStart: targetLeft
+                }, {
+                    duration: _.options.speed,
+                    easing: _.options.easing,
+                    step: function(now) {
+                        now = Math.ceil(now);
+                        if (_.options.vertical === false) {
+                            animProps[_.animType] = 'translate(' +
+                                now + 'px, 0px)';
+                            _.$slideTrack.css(animProps);
+                        } else {
+                            animProps[_.animType] = 'translate(0px,' +
+                                now + 'px)';
+                            _.$slideTrack.css(animProps);
+                        }
+                    },
+                    complete: function() {
+                        if (callback) {
+                            callback.call();
+                        }
+                    }
+                });
+
+            } else {
+
+                _.applyTransition();
+                targetLeft = Math.ceil(targetLeft);
+
+                if (_.options.vertical === false) {
+                    animProps[_.animType] = 'translate3d(' + targetLeft + 'px, 0px, 0px)';
+                } else {
+                    animProps[_.animType] = 'translate3d(0px,' + targetLeft + 'px, 0px)';
+                }
+                _.$slideTrack.css(animProps);
+
+                if (callback) {
+                    setTimeout(function() {
+
+                        _.disableTransition();
+
+                        callback.call();
+                    }, _.options.speed);
+                }
+
+            }
+
+        }
+
+    };
+
+    Slick.prototype.asNavFor = function(index) {
+
+        var _ = this,
+            asNavFor = _.options.asNavFor;
+
+        if ( asNavFor && asNavFor !== null ) {
+            asNavFor = $(asNavFor).not(_.$slider);
+        }
+
+        if ( asNavFor !== null && typeof asNavFor === 'object' ) {
+            asNavFor.each(function() {
+                var target = $(this).slick('getSlick');
+                if(!target.unslicked) {
+                    target.slideHandler(index, true);
+                }
+            });
+        }
+
+    };
+
+    Slick.prototype.applyTransition = function(slide) {
+
+        var _ = this,
+            transition = {};
+
+        if (_.options.fade === false) {
+            transition[_.transitionType] = _.transformType + ' ' + _.options.speed + 'ms ' + _.options.cssEase;
+        } else {
+            transition[_.transitionType] = 'opacity ' + _.options.speed + 'ms ' + _.options.cssEase;
+        }
+
+        if (_.options.fade === false) {
+            _.$slideTrack.css(transition);
+        } else {
+            _.$slides.eq(slide).css(transition);
+        }
+
+    };
+
+    Slick.prototype.autoPlay = function() {
+
+        var _ = this;
+
+        if (_.autoPlayTimer) {
+            clearInterval(_.autoPlayTimer);
+        }
+
+        if (_.slideCount > _.options.slidesToShow && _.paused !== true) {
+            _.autoPlayTimer = setInterval(_.autoPlayIterator,
+                _.options.autoplaySpeed);
+        }
+
+    };
+
+    Slick.prototype.autoPlayClear = function() {
+
+        var _ = this;
+        if (_.autoPlayTimer) {
+            clearInterval(_.autoPlayTimer);
+        }
+
+    };
+
+    Slick.prototype.autoPlayIterator = function() {
+
+        var _ = this;
+
+        if (_.options.infinite === false) {
+
+            if (_.direction === 1) {
+
+                if ((_.currentSlide + 1) === _.slideCount -
+                    1) {
+                    _.direction = 0;
+                }
+
+                _.slideHandler(_.currentSlide + _.options.slidesToScroll);
+
+            } else {
+
+                if ((_.currentSlide - 1 === 0)) {
+
+                    _.direction = 1;
+
+                }
+
+                _.slideHandler(_.currentSlide - _.options.slidesToScroll);
+
+            }
+
+        } else {
+
+            _.slideHandler(_.currentSlide + _.options.slidesToScroll);
+
+        }
+
+    };
+
+    Slick.prototype.buildArrows = function() {
+
+        var _ = this;
+
+        if (_.options.arrows === true ) {
+
+            _.$prevArrow = $(_.options.prevArrow).addClass('slick-arrow');
+            _.$nextArrow = $(_.options.nextArrow).addClass('slick-arrow');
+
+            if( _.slideCount > _.options.slidesToShow ) {
+
+                _.$prevArrow.removeClass('slick-hidden').removeAttr('aria-hidden tabindex');
+                _.$nextArrow.removeClass('slick-hidden').removeAttr('aria-hidden tabindex');
+
+                if (_.htmlExpr.test(_.options.prevArrow)) {
+                    _.$prevArrow.prependTo(_.options.appendArrows);
+                }
+
+                if (_.htmlExpr.test(_.options.nextArrow)) {
+                    _.$nextArrow.appendTo(_.options.appendArrows);
+                }
+
+                if (_.options.infinite !== true) {
+                    _.$prevArrow
+                        .addClass('slick-disabled')
+                        .attr('aria-disabled', 'true');
+                }
+
+            } else {
+
+                _.$prevArrow.add( _.$nextArrow )
+
+                    .addClass('slick-hidden')
+                    .attr({
+                        'aria-disabled': 'true',
+                        'tabindex': '-1'
+                    });
+
+            }
+
+        }
+
+    };
+
+    Slick.prototype.buildDots = function() {
+
+        var _ = this,
+            i, dotString;
+
+        if (_.options.dots === true && _.slideCount > _.options.slidesToShow) {
+
+            dotString = '<ul class="' + _.options.dotsClass + '">';
+
+            for (i = 0; i <= _.getDotCount(); i += 1) {
+                dotString += '<li>' + _.options.customPaging.call(this, _, i) + '</li>';
+            }
+
+            dotString += '</ul>';
+
+            _.$dots = $(dotString).appendTo(
+                _.options.appendDots);
+
+            _.$dots.find('li').first().addClass('slick-active').attr('aria-hidden', 'false');
+
+        }
+
+    };
+
+    Slick.prototype.buildOut = function() {
+
+        var _ = this;
+
+        _.$slides =
+            _.$slider
+                .children( _.options.slide + ':not(.slick-cloned)')
+                .addClass('slick-slide');
+
+        _.slideCount = _.$slides.length;
+
+        _.$slides.each(function(index, element) {
+            $(element)
+                .attr('data-slick-index', index)
+                .data('originalStyling', $(element).attr('style') || '');
+        });
+
+        _.$slider.addClass('slick-slider');
+
+        _.$slideTrack = (_.slideCount === 0) ?
+            $('<div class="slick-track"/>').appendTo(_.$slider) :
+            _.$slides.wrapAll('<div class="slick-track"/>').parent();
+
+        _.$list = _.$slideTrack.wrap(
+            '<div aria-live="polite" class="slick-list"/>').parent();
+        _.$slideTrack.css('opacity', 0);
+
+        if (_.options.centerMode === true || _.options.swipeToSlide === true) {
+            _.options.slidesToScroll = 1;
+        }
+
+        $('img[data-lazy]', _.$slider).not('[src]').addClass('slick-loading');
+
+        _.setupInfinite();
+
+        _.buildArrows();
+
+        _.buildDots();
+
+        _.updateDots();
+
+
+        _.setSlideClasses(typeof _.currentSlide === 'number' ? _.currentSlide : 0);
+
+        if (_.options.draggable === true) {
+            _.$list.addClass('draggable');
+        }
+
+    };
+
+    Slick.prototype.buildRows = function() {
+
+        var _ = this, a, b, c, newSlides, numOfSlides, originalSlides,slidesPerSection;
+
+        newSlides = document.createDocumentFragment();
+        originalSlides = _.$slider.children();
+
+        if(_.options.rows > 1) {
+
+            slidesPerSection = _.options.slidesPerRow * _.options.rows;
+            numOfSlides = Math.ceil(
+                originalSlides.length / slidesPerSection
+            );
+
+            for(a = 0; a < numOfSlides; a++){
+                var slide = document.createElement('div');
+                for(b = 0; b < _.options.rows; b++) {
+                    var row = document.createElement('div');
+                    for(c = 0; c < _.options.slidesPerRow; c++) {
+                        var target = (a * slidesPerSection + ((b * _.options.slidesPerRow) + c));
+                        if (originalSlides.get(target)) {
+                            row.appendChild(originalSlides.get(target));
+                        }
+                    }
+                    slide.appendChild(row);
+                }
+                newSlides.appendChild(slide);
+            }
+
+            _.$slider.html(newSlides);
+            _.$slider.children().children().children()
+                .css({
+                    'width':(100 / _.options.slidesPerRow) + '%',
+                    'display': 'inline-block'
+                });
+
+        }
+
+    };
+
+    Slick.prototype.checkResponsive = function(initial, forceUpdate) {
+
+        var _ = this,
+            breakpoint, targetBreakpoint, respondToWidth, triggerBreakpoint = false;
+        var sliderWidth = _.$slider.width();
+        var windowWidth = window.innerWidth || $(window).width();
+
+        if (_.respondTo === 'window') {
+            respondToWidth = windowWidth;
+        } else if (_.respondTo === 'slider') {
+            respondToWidth = sliderWidth;
+        } else if (_.respondTo === 'min') {
+            respondToWidth = Math.min(windowWidth, sliderWidth);
+        }
+
+        if ( _.options.responsive &&
+            _.options.responsive.length &&
+            _.options.responsive !== null) {
+
+            targetBreakpoint = null;
+
+            for (breakpoint in _.breakpoints) {
+                if (_.breakpoints.hasOwnProperty(breakpoint)) {
+                    if (_.originalSettings.mobileFirst === false) {
+                        if (respondToWidth < _.breakpoints[breakpoint]) {
+                            targetBreakpoint = _.breakpoints[breakpoint];
+                        }
+                    } else {
+                        if (respondToWidth > _.breakpoints[breakpoint]) {
+                            targetBreakpoint = _.breakpoints[breakpoint];
+                        }
+                    }
+                }
+            }
+
+            if (targetBreakpoint !== null) {
+                if (_.activeBreakpoint !== null) {
+                    if (targetBreakpoint !== _.activeBreakpoint || forceUpdate) {
+                        _.activeBreakpoint =
+                            targetBreakpoint;
+                        if (_.breakpointSettings[targetBreakpoint] === 'unslick') {
+                            _.unslick(targetBreakpoint);
+                        } else {
+                            _.options = $.extend({}, _.originalSettings,
+                                _.breakpointSettings[
+                                    targetBreakpoint]);
+                            if (initial === true) {
+                                _.currentSlide = _.options.initialSlide;
+                            }
+                            _.refresh(initial);
+                        }
+                        triggerBreakpoint = targetBreakpoint;
+                    }
+                } else {
+                    _.activeBreakpoint = targetBreakpoint;
+                    if (_.breakpointSettings[targetBreakpoint] === 'unslick') {
+                        _.unslick(targetBreakpoint);
+                    } else {
+                        _.options = $.extend({}, _.originalSettings,
+                            _.breakpointSettings[
+                                targetBreakpoint]);
+                        if (initial === true) {
+                            _.currentSlide = _.options.initialSlide;
+                        }
+                        _.refresh(initial);
+                    }
+                    triggerBreakpoint = targetBreakpoint;
+                }
+            } else {
+                if (_.activeBreakpoint !== null) {
+                    _.activeBreakpoint = null;
+                    _.options = _.originalSettings;
+                    if (initial === true) {
+                        _.currentSlide = _.options.initialSlide;
+                    }
+                    _.refresh(initial);
+                    triggerBreakpoint = targetBreakpoint;
+                }
+            }
+
+            // only trigger breakpoints during an actual break. not on initialize.
+            if( !initial && triggerBreakpoint !== false ) {
+                _.$slider.trigger('breakpoint', [_, triggerBreakpoint]);
+            }
+        }
+
+    };
+
+    Slick.prototype.changeSlide = function(event, dontAnimate) {
+
+        var _ = this,
+            $target = $(event.target),
+            indexOffset, slideOffset, unevenOffset;
+
+        // If target is a link, prevent default action.
+        if($target.is('a')) {
+            event.preventDefault();
+        }
+
+        // If target is not the <li> element (ie: a child), find the <li>.
+        if(!$target.is('li')) {
+            $target = $target.closest('li');
+        }
+
+        unevenOffset = (_.slideCount % _.options.slidesToScroll !== 0);
+        indexOffset = unevenOffset ? 0 : (_.slideCount - _.currentSlide) % _.options.slidesToScroll;
+
+        switch (event.data.message) {
+
+            case 'previous':
+                slideOffset = indexOffset === 0 ? _.options.slidesToScroll : _.options.slidesToShow - indexOffset;
+                if (_.slideCount > _.options.slidesToShow) {
+                    _.slideHandler(_.currentSlide - slideOffset, false, dontAnimate);
+                }
+                break;
+
+            case 'next':
+                slideOffset = indexOffset === 0 ? _.options.slidesToScroll : indexOffset;
+                if (_.slideCount > _.options.slidesToShow) {
+                    _.slideHandler(_.currentSlide + slideOffset, false, dontAnimate);
+                }
+                break;
+
+            case 'index':
+                var index = event.data.index === 0 ? 0 :
+                    event.data.index || $target.index() * _.options.slidesToScroll;
+
+                _.slideHandler(_.checkNavigable(index), false, dontAnimate);
+                $target.children().trigger('focus');
+                break;
+
+            default:
+                return;
+        }
+
+    };
+
+    Slick.prototype.checkNavigable = function(index) {
+
+        var _ = this,
+            navigables, prevNavigable;
+
+        navigables = _.getNavigableIndexes();
+        prevNavigable = 0;
+        if (index > navigables[navigables.length - 1]) {
+            index = navigables[navigables.length - 1];
+        } else {
+            for (var n in navigables) {
+                if (index < navigables[n]) {
+                    index = prevNavigable;
+                    break;
+                }
+                prevNavigable = navigables[n];
+            }
+        }
+
+        return index;
+    };
+
+    Slick.prototype.cleanUpEvents = function() {
+
+        var _ = this;
+
+        if (_.options.dots && _.$dots !== null) {
+
+            $('li', _.$dots).off('click.slick', _.changeSlide);
+
+            if (_.options.pauseOnDotsHover === true && _.options.autoplay === true) {
+
+                $('li', _.$dots)
+                    .off('mouseenter.slick', $.proxy(_.setPaused, _, true))
+                    .off('mouseleave.slick', $.proxy(_.setPaused, _, false));
+
+            }
+
+        }
+
+        if (_.options.arrows === true && _.slideCount > _.options.slidesToShow) {
+            _.$prevArrow && _.$prevArrow.off('click.slick', _.changeSlide);
+            _.$nextArrow && _.$nextArrow.off('click.slick', _.changeSlide);
+        }
+
+        _.$list.off('touchstart.slick mousedown.slick', _.swipeHandler);
+        _.$list.off('touchmove.slick mousemove.slick', _.swipeHandler);
+        _.$list.off('touchend.slick mouseup.slick', _.swipeHandler);
+        _.$list.off('touchcancel.slick mouseleave.slick', _.swipeHandler);
+
+        _.$list.off('click.slick', _.clickHandler);
+
+        $(document).off(_.visibilityChange, _.visibility);
+
+        _.$list.off('mouseenter.slick', $.proxy(_.setPaused, _, true));
+        _.$list.off('mouseleave.slick', $.proxy(_.setPaused, _, false));
+
+        if (_.options.accessibility === true) {
+            _.$list.off('keydown.slick', _.keyHandler);
+        }
+
+        if (_.options.focusOnSelect === true) {
+            $(_.$slideTrack).children().off('click.slick', _.selectHandler);
+        }
+
+        $(window).off('orientationchange.slick.slick-' + _.instanceUid, _.orientationChange);
+
+        $(window).off('resize.slick.slick-' + _.instanceUid, _.resize);
+
+        $('[draggable!=true]', _.$slideTrack).off('dragstart', _.preventDefault);
+
+        $(window).off('load.slick.slick-' + _.instanceUid, _.setPosition);
+        $(document).off('ready.slick.slick-' + _.instanceUid, _.setPosition);
+    };
+
+    Slick.prototype.cleanUpRows = function() {
+
+        var _ = this, originalSlides;
+
+        if(_.options.rows > 1) {
+            originalSlides = _.$slides.children().children();
+            originalSlides.removeAttr('style');
+            _.$slider.html(originalSlides);
+        }
+
+    };
+
+    Slick.prototype.clickHandler = function(event) {
+
+        var _ = this;
+
+        if (_.shouldClick === false) {
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+            event.preventDefault();
+        }
+
+    };
+
+    Slick.prototype.destroy = function(refresh) {
+
+        var _ = this;
+
+        _.autoPlayClear();
+
+        _.touchObject = {};
+
+        _.cleanUpEvents();
+
+        $('.slick-cloned', _.$slider).detach();
+
+        if (_.$dots) {
+            _.$dots.remove();
+        }
+
+
+        if ( _.$prevArrow && _.$prevArrow.length ) {
+
+            _.$prevArrow
+                .removeClass('slick-disabled slick-arrow slick-hidden')
+                .removeAttr('aria-hidden aria-disabled tabindex')
+                .css("display","");
+
+            if ( _.htmlExpr.test( _.options.prevArrow )) {
+                _.$prevArrow.remove();
+            }
+        }
+
+        if ( _.$nextArrow && _.$nextArrow.length ) {
+
+            _.$nextArrow
+                .removeClass('slick-disabled slick-arrow slick-hidden')
+                .removeAttr('aria-hidden aria-disabled tabindex')
+                .css("display","");
+
+            if ( _.htmlExpr.test( _.options.nextArrow )) {
+                _.$nextArrow.remove();
+            }
+
+        }
+
+
+        if (_.$slides) {
+
+            _.$slides
+                .removeClass('slick-slide slick-active slick-center slick-visible slick-current')
+                .removeAttr('aria-hidden')
+                .removeAttr('data-slick-index')
+                .each(function(){
+                    $(this).attr('style', $(this).data('originalStyling'));
+                });
+
+            _.$slideTrack.children(this.options.slide).detach();
+
+            _.$slideTrack.detach();
+
+            _.$list.detach();
+
+            _.$slider.append(_.$slides);
+        }
+
+        _.cleanUpRows();
+
+        _.$slider.removeClass('slick-slider');
+        _.$slider.removeClass('slick-initialized');
+
+        _.unslicked = true;
+
+        if(!refresh) {
+            _.$slider.trigger('destroy', [_]);
+        }
+
+    };
+
+    Slick.prototype.disableTransition = function(slide) {
+
+        var _ = this,
+            transition = {};
+
+        transition[_.transitionType] = '';
+
+        if (_.options.fade === false) {
+            _.$slideTrack.css(transition);
+        } else {
+            _.$slides.eq(slide).css(transition);
+        }
+
+    };
+
+    Slick.prototype.fadeSlide = function(slideIndex, callback) {
+
+        var _ = this;
+
+        if (_.cssTransitions === false) {
+
+            _.$slides.eq(slideIndex).css({
+                zIndex: _.options.zIndex
+            });
+
+            _.$slides.eq(slideIndex).animate({
+                opacity: 1
+            }, _.options.speed, _.options.easing, callback);
+
+        } else {
+
+            _.applyTransition(slideIndex);
+
+            _.$slides.eq(slideIndex).css({
+                opacity: 1,
+                zIndex: _.options.zIndex
+            });
+
+            if (callback) {
+                setTimeout(function() {
+
+                    _.disableTransition(slideIndex);
+
+                    callback.call();
+                }, _.options.speed);
+            }
+
+        }
+
+    };
+
+    Slick.prototype.fadeSlideOut = function(slideIndex) {
+
+        var _ = this;
+
+        if (_.cssTransitions === false) {
+
+            _.$slides.eq(slideIndex).animate({
+                opacity: 0,
+                zIndex: _.options.zIndex - 2
+            }, _.options.speed, _.options.easing);
+
+        } else {
+
+            _.applyTransition(slideIndex);
+
+            _.$slides.eq(slideIndex).css({
+                opacity: 0,
+                zIndex: _.options.zIndex - 2
+            });
+
+        }
+
+    };
+
+    Slick.prototype.filterSlides = Slick.prototype.slickFilter = function(filter) {
+
+        var _ = this;
+
+        if (filter !== null) {
+
+            _.$slidesCache = _.$slides;
+
+            _.unload();
+
+            _.$slideTrack.children(this.options.slide).detach();
+
+            _.$slidesCache.filter(filter).appendTo(_.$slideTrack);
+
+            _.reinit();
+
+        }
+
+    };
+
+    Slick.prototype.getCurrent = Slick.prototype.slickCurrentSlide = function() {
+
+        var _ = this;
+        return _.currentSlide;
+
+    };
+
+    Slick.prototype.getDotCount = function() {
+
+        var _ = this;
+
+        var breakPoint = 0;
+        var counter = 0;
+        var pagerQty = 0;
+
+        if (_.options.infinite === true) {
+            while (breakPoint < _.slideCount) {
+                ++pagerQty;
+                breakPoint = counter + _.options.slidesToScroll;
+                counter += _.options.slidesToScroll <= _.options.slidesToShow ? _.options.slidesToScroll : _.options.slidesToShow;
+            }
+        } else if (_.options.centerMode === true) {
+            pagerQty = _.slideCount;
+        } else {
+            while (breakPoint < _.slideCount) {
+                ++pagerQty;
+                breakPoint = counter + _.options.slidesToScroll;
+                counter += _.options.slidesToScroll <= _.options.slidesToShow ? _.options.slidesToScroll : _.options.slidesToShow;
+            }
+        }
+
+        return pagerQty - 1;
+
+    };
+
+    Slick.prototype.getLeft = function(slideIndex) {
+
+        var _ = this,
+            targetLeft,
+            verticalHeight,
+            verticalOffset = 0,
+            targetSlide;
+
+        _.slideOffset = 0;
+        verticalHeight = _.$slides.first().outerHeight(true);
+
+        if (_.options.infinite === true) {
+            if (_.slideCount > _.options.slidesToShow) {
+                _.slideOffset = (_.slideWidth * _.options.slidesToShow) * -1;
+                verticalOffset = (verticalHeight * _.options.slidesToShow) * -1;
+            }
+            if (_.slideCount % _.options.slidesToScroll !== 0) {
+                if (slideIndex + _.options.slidesToScroll > _.slideCount && _.slideCount > _.options.slidesToShow) {
+                    if (slideIndex > _.slideCount) {
+                        _.slideOffset = ((_.options.slidesToShow - (slideIndex - _.slideCount)) * _.slideWidth) * -1;
+                        verticalOffset = ((_.options.slidesToShow - (slideIndex - _.slideCount)) * verticalHeight) * -1;
+                    } else {
+                        _.slideOffset = ((_.slideCount % _.options.slidesToScroll) * _.slideWidth) * -1;
+                        verticalOffset = ((_.slideCount % _.options.slidesToScroll) * verticalHeight) * -1;
+                    }
+                }
+            }
+        } else {
+            if (slideIndex + _.options.slidesToShow > _.slideCount) {
+                _.slideOffset = ((slideIndex + _.options.slidesToShow) - _.slideCount) * _.slideWidth;
+                verticalOffset = ((slideIndex + _.options.slidesToShow) - _.slideCount) * verticalHeight;
+            }
+        }
+
+        if (_.slideCount <= _.options.slidesToShow) {
+            _.slideOffset = 0;
+            verticalOffset = 0;
+        }
+
+        if (_.options.centerMode === true && _.options.infinite === true) {
+            _.slideOffset += _.slideWidth * Math.floor(_.options.slidesToShow / 2) - _.slideWidth;
+        } else if (_.options.centerMode === true) {
+            _.slideOffset = 0;
+            _.slideOffset += _.slideWidth * Math.floor(_.options.slidesToShow / 2);
+        }
+
+        if (_.options.vertical === false) {
+            targetLeft = ((slideIndex * _.slideWidth) * -1) + _.slideOffset;
+        } else {
+            targetLeft = ((slideIndex * verticalHeight) * -1) + verticalOffset;
+        }
+
+        if (_.options.variableWidth === true) {
+
+            if (_.slideCount <= _.options.slidesToShow || _.options.infinite === false) {
+                targetSlide = _.$slideTrack.children('.slick-slide').eq(slideIndex);
+            } else {
+                targetSlide = _.$slideTrack.children('.slick-slide').eq(slideIndex + _.options.slidesToShow);
+            }
+
+            if (_.options.rtl === true) {
+                if (targetSlide[0]) {
+                    targetLeft = (_.$slideTrack.width() - targetSlide[0].offsetLeft - targetSlide.width()) * -1;
+                } else {
+                    targetLeft =  0;
+                }
+            } else {
+                targetLeft = targetSlide[0] ? targetSlide[0].offsetLeft * -1 : 0;
+            }
+
+            if (_.options.centerMode === true) {
+                if (_.slideCount <= _.options.slidesToShow || _.options.infinite === false) {
+                    targetSlide = _.$slideTrack.children('.slick-slide').eq(slideIndex);
+                } else {
+                    targetSlide = _.$slideTrack.children('.slick-slide').eq(slideIndex + _.options.slidesToShow + 1);
+                }
+
+                if (_.options.rtl === true) {
+                    if (targetSlide[0]) {
+                        targetLeft = (_.$slideTrack.width() - targetSlide[0].offsetLeft - targetSlide.width()) * -1;
+                    } else {
+                        targetLeft =  0;
+                    }
+                } else {
+                    targetLeft = targetSlide[0] ? targetSlide[0].offsetLeft * -1 : 0;
+                }
+
+                targetLeft += (_.$list.width() - targetSlide.outerWidth()) / 2;
+            }
+        }
+
+        return targetLeft;
+
+    };
+
+    Slick.prototype.getOption = Slick.prototype.slickGetOption = function(option) {
+
+        var _ = this;
+
+        return _.options[option];
+
+    };
+
+    Slick.prototype.getNavigableIndexes = function() {
+
+        var _ = this,
+            breakPoint = 0,
+            counter = 0,
+            indexes = [],
+            max;
+
+        if (_.options.infinite === false) {
+            max = _.slideCount;
+        } else {
+            breakPoint = _.options.slidesToScroll * -1;
+            counter = _.options.slidesToScroll * -1;
+            max = _.slideCount * 2;
+        }
+
+        while (breakPoint < max) {
+            indexes.push(breakPoint);
+            breakPoint = counter + _.options.slidesToScroll;
+            counter += _.options.slidesToScroll <= _.options.slidesToShow ? _.options.slidesToScroll : _.options.slidesToShow;
+        }
+
+        return indexes;
+
+    };
+
+    Slick.prototype.getSlick = function() {
+
+        return this;
+
+    };
+
+    Slick.prototype.getSlideCount = function() {
+
+        var _ = this,
+            slidesTraversed, swipedSlide, centerOffset;
+
+        centerOffset = _.options.centerMode === true ? _.slideWidth * Math.floor(_.options.slidesToShow / 2) : 0;
+
+        if (_.options.swipeToSlide === true) {
+            _.$slideTrack.find('.slick-slide').each(function(index, slide) {
+                if (slide.offsetLeft - centerOffset + ($(slide).outerWidth() / 2) > (_.swipeLeft * -1)) {
+                    swipedSlide = slide;
+                    return false;
+                }
+            });
+
+            slidesTraversed = Math.abs($(swipedSlide).attr('data-slick-index') - _.currentSlide) || 1;
+
+            return slidesTraversed;
+
+        } else {
+            return _.options.slidesToScroll;
+        }
+
+    };
+
+    Slick.prototype.goTo = Slick.prototype.slickGoTo = function(slide, dontAnimate) {
+
+        var _ = this;
+
+        _.changeSlide({
+            data: {
+                message: 'index',
+                index: parseInt(slide)
+            }
+        }, dontAnimate);
+
+    };
+
+    Slick.prototype.init = function(creation) {
+
+        var _ = this;
+
+        if (!$(_.$slider).hasClass('slick-initialized')) {
+
+            $(_.$slider).addClass('slick-initialized');
+
+            _.buildRows();
+            _.buildOut();
+            _.setProps();
+            _.startLoad();
+            _.loadSlider();
+            _.initializeEvents();
+            _.updateArrows();
+            _.updateDots();
+
+        }
+
+        if (creation) {
+            _.$slider.trigger('init', [_]);
+        }
+
+        if (_.options.accessibility === true) {
+            _.initADA();
+        }
+
+    };
+
+    Slick.prototype.initArrowEvents = function() {
+
+        var _ = this;
+
+        if (_.options.arrows === true && _.slideCount > _.options.slidesToShow) {
+            _.$prevArrow.on('click.slick', {
+                message: 'previous'
+            }, _.changeSlide);
+            _.$nextArrow.on('click.slick', {
+                message: 'next'
+            }, _.changeSlide);
+        }
+
+    };
+
+    Slick.prototype.initDotEvents = function() {
+
+        var _ = this;
+
+        if (_.options.dots === true && _.slideCount > _.options.slidesToShow) {
+            $('li', _.$dots).on('click.slick', {
+                message: 'index'
+            }, _.changeSlide);
+        }
+
+        if (_.options.dots === true && _.options.pauseOnDotsHover === true && _.options.autoplay === true) {
+            $('li', _.$dots)
+                .on('mouseenter.slick', $.proxy(_.setPaused, _, true))
+                .on('mouseleave.slick', $.proxy(_.setPaused, _, false));
+        }
+
+    };
+
+    Slick.prototype.initializeEvents = function() {
+
+        var _ = this;
+
+        _.initArrowEvents();
+
+        _.initDotEvents();
+
+        _.$list.on('touchstart.slick mousedown.slick', {
+            action: 'start'
+        }, _.swipeHandler);
+        _.$list.on('touchmove.slick mousemove.slick', {
+            action: 'move'
+        }, _.swipeHandler);
+        _.$list.on('touchend.slick mouseup.slick', {
+            action: 'end'
+        }, _.swipeHandler);
+        _.$list.on('touchcancel.slick mouseleave.slick', {
+            action: 'end'
+        }, _.swipeHandler);
+
+        _.$list.on('click.slick', _.clickHandler);
+
+        $(document).on(_.visibilityChange, $.proxy(_.visibility, _));
+
+        _.$list.on('mouseenter.slick', $.proxy(_.setPaused, _, true));
+        _.$list.on('mouseleave.slick', $.proxy(_.setPaused, _, false));
+
+        if (_.options.accessibility === true) {
+            _.$list.on('keydown.slick', _.keyHandler);
+        }
+
+        if (_.options.focusOnSelect === true) {
+            $(_.$slideTrack).children().on('click.slick', _.selectHandler);
+        }
+
+        $(window).on('orientationchange.slick.slick-' + _.instanceUid, $.proxy(_.orientationChange, _));
+
+        $(window).on('resize.slick.slick-' + _.instanceUid, $.proxy(_.resize, _));
+
+        $('[draggable!=true]', _.$slideTrack).on('dragstart', _.preventDefault);
+
+        $(window).on('load.slick.slick-' + _.instanceUid, _.setPosition);
+        $(document).on('ready.slick.slick-' + _.instanceUid, _.setPosition);
+
+    };
+
+    Slick.prototype.initUI = function() {
+
+        var _ = this;
+
+        if (_.options.arrows === true && _.slideCount > _.options.slidesToShow) {
+
+            _.$prevArrow.show();
+            _.$nextArrow.show();
+
+        }
+
+        if (_.options.dots === true && _.slideCount > _.options.slidesToShow) {
+
+            _.$dots.show();
+
+        }
+
+        if (_.options.autoplay === true) {
+
+            _.autoPlay();
+
+        }
+
+    };
+
+    Slick.prototype.keyHandler = function(event) {
+
+        var _ = this;
+         //Dont slide if the cursor is inside the form fields and arrow keys are pressed
+        if(!event.target.tagName.match('TEXTAREA|INPUT|SELECT')) {
+            if (event.keyCode === 37 && _.options.accessibility === true) {
+                _.changeSlide({
+                    data: {
+                        message: 'previous'
+                    }
+                });
+            } else if (event.keyCode === 39 && _.options.accessibility === true) {
+                _.changeSlide({
+                    data: {
+                        message: 'next'
+                    }
+                });
+            }
+        }
+
+    };
+
+    Slick.prototype.lazyLoad = function() {
+
+        var _ = this,
+            loadRange, cloneRange, rangeStart, rangeEnd;
+
+        function loadImages(imagesScope) {
+            $('img[data-lazy]', imagesScope).each(function() {
+
+                var image = $(this),
+                    imageSource = $(this).attr('data-lazy'),
+                    imageToLoad = document.createElement('img');
+
+                imageToLoad.onload = function() {
+                    image
+                        .animate({ opacity: 0 }, 100, function() {
+                            image
+                                .attr('src', imageSource)
+                                .animate({ opacity: 1 }, 200, function() {
+                                    image
+                                        .removeAttr('data-lazy')
+                                        .removeClass('slick-loading');
+                                });
+                        });
+                };
+
+                imageToLoad.src = imageSource;
+
+            });
+        }
+
+        if (_.options.centerMode === true) {
+            if (_.options.infinite === true) {
+                rangeStart = _.currentSlide + (_.options.slidesToShow / 2 + 1);
+                rangeEnd = rangeStart + _.options.slidesToShow + 2;
+            } else {
+                rangeStart = Math.max(0, _.currentSlide - (_.options.slidesToShow / 2 + 1));
+                rangeEnd = 2 + (_.options.slidesToShow / 2 + 1) + _.currentSlide;
+            }
+        } else {
+            rangeStart = _.options.infinite ? _.options.slidesToShow + _.currentSlide : _.currentSlide;
+            rangeEnd = rangeStart + _.options.slidesToShow;
+            if (_.options.fade === true) {
+                if (rangeStart > 0) rangeStart--;
+                if (rangeEnd <= _.slideCount) rangeEnd++;
+            }
+        }
+
+        loadRange = _.$slider.find('.slick-slide').slice(rangeStart, rangeEnd);
+        loadImages(loadRange);
+
+        if (_.slideCount <= _.options.slidesToShow) {
+            cloneRange = _.$slider.find('.slick-slide');
+            loadImages(cloneRange);
+        } else
+        if (_.currentSlide >= _.slideCount - _.options.slidesToShow) {
+            cloneRange = _.$slider.find('.slick-cloned').slice(0, _.options.slidesToShow);
+            loadImages(cloneRange);
+        } else if (_.currentSlide === 0) {
+            cloneRange = _.$slider.find('.slick-cloned').slice(_.options.slidesToShow * -1);
+            loadImages(cloneRange);
+        }
+
+    };
+
+    Slick.prototype.loadSlider = function() {
+
+        var _ = this;
+
+        _.setPosition();
+
+        _.$slideTrack.css({
+            opacity: 1
+        });
+
+        _.$slider.removeClass('slick-loading');
+
+        _.initUI();
+
+        if (_.options.lazyLoad === 'progressive') {
+            _.progressiveLazyLoad();
+        }
+
+    };
+
+    Slick.prototype.next = Slick.prototype.slickNext = function() {
+
+        var _ = this;
+
+        _.changeSlide({
+            data: {
+                message: 'next'
+            }
+        });
+
+    };
+
+    Slick.prototype.orientationChange = function() {
+
+        var _ = this;
+
+        _.checkResponsive();
+        _.setPosition();
+
+    };
+
+    Slick.prototype.pause = Slick.prototype.slickPause = function() {
+
+        var _ = this;
+
+        _.autoPlayClear();
+        _.paused = true;
+
+    };
+
+    Slick.prototype.play = Slick.prototype.slickPlay = function() {
+
+        var _ = this;
+
+        _.paused = false;
+        _.autoPlay();
+
+    };
+
+    Slick.prototype.postSlide = function(index) {
+
+        var _ = this;
+
+        _.$slider.trigger('afterChange', [_, index]);
+
+        _.animating = false;
+
+        _.setPosition();
+
+        _.swipeLeft = null;
+
+        if (_.options.autoplay === true && _.paused === false) {
+            _.autoPlay();
+        }
+        if (_.options.accessibility === true) {
+            _.initADA();
+        }
+
+    };
+
+    Slick.prototype.prev = Slick.prototype.slickPrev = function() {
+
+        var _ = this;
+
+        _.changeSlide({
+            data: {
+                message: 'previous'
+            }
+        });
+
+    };
+
+    Slick.prototype.preventDefault = function(event) {
+        event.preventDefault();
+    };
+
+    Slick.prototype.progressiveLazyLoad = function() {
+
+        var _ = this,
+            imgCount, targetImage;
+
+        imgCount = $('img[data-lazy]', _.$slider).length;
+
+        if (imgCount > 0) {
+            targetImage = $('img[data-lazy]', _.$slider).first();
+            targetImage.attr('src', null);
+            targetImage.attr('src', targetImage.attr('data-lazy')).removeClass('slick-loading').load(function() {
+                    targetImage.removeAttr('data-lazy');
+                    _.progressiveLazyLoad();
+
+                    if (_.options.adaptiveHeight === true) {
+                        _.setPosition();
+                    }
+                })
+                .error(function() {
+                    targetImage.removeAttr('data-lazy');
+                    _.progressiveLazyLoad();
+                });
+        }
+
+    };
+
+    Slick.prototype.refresh = function( initializing ) {
+
+        var _ = this, currentSlide, firstVisible;
+
+        firstVisible = _.slideCount - _.options.slidesToShow;
+
+        // check that the new breakpoint can actually accept the
+        // "current slide" as the current slide, otherwise we need
+        // to set it to the closest possible value.
+        if ( !_.options.infinite ) {
+            if ( _.slideCount <= _.options.slidesToShow ) {
+                _.currentSlide = 0;
+            } else if ( _.currentSlide > firstVisible ) {
+                _.currentSlide = firstVisible;
+            }
+        }
+
+         currentSlide = _.currentSlide;
+
+        _.destroy(true);
+
+        $.extend(_, _.initials, { currentSlide: currentSlide });
+
+        _.init();
+
+        if( !initializing ) {
+
+            _.changeSlide({
+                data: {
+                    message: 'index',
+                    index: currentSlide
+                }
+            }, false);
+
+        }
+
+    };
+
+    Slick.prototype.registerBreakpoints = function() {
+
+        var _ = this, breakpoint, currentBreakpoint, l,
+            responsiveSettings = _.options.responsive || null;
+
+        if ( $.type(responsiveSettings) === "array" && responsiveSettings.length ) {
+
+            _.respondTo = _.options.respondTo || 'window';
+
+            for ( breakpoint in responsiveSettings ) {
+
+                l = _.breakpoints.length-1;
+                currentBreakpoint = responsiveSettings[breakpoint].breakpoint;
+
+                if (responsiveSettings.hasOwnProperty(breakpoint)) {
+
+                    // loop through the breakpoints and cut out any existing
+                    // ones with the same breakpoint number, we don't want dupes.
+                    while( l >= 0 ) {
+                        if( _.breakpoints[l] && _.breakpoints[l] === currentBreakpoint ) {
+                            _.breakpoints.splice(l,1);
+                        }
+                        l--;
+                    }
+
+                    _.breakpoints.push(currentBreakpoint);
+                    _.breakpointSettings[currentBreakpoint] = responsiveSettings[breakpoint].settings;
+
+                }
+
+            }
+
+            _.breakpoints.sort(function(a, b) {
+                return ( _.options.mobileFirst ) ? a-b : b-a;
+            });
+
+        }
+
+    };
+
+    Slick.prototype.reinit = function() {
+
+        var _ = this;
+
+        _.$slides =
+            _.$slideTrack
+                .children(_.options.slide)
+                .addClass('slick-slide');
+
+        _.slideCount = _.$slides.length;
+
+        if (_.currentSlide >= _.slideCount && _.currentSlide !== 0) {
+            _.currentSlide = _.currentSlide - _.options.slidesToScroll;
+        }
+
+        if (_.slideCount <= _.options.slidesToShow) {
+            _.currentSlide = 0;
+        }
+
+        _.registerBreakpoints();
+
+        _.setProps();
+        _.setupInfinite();
+        _.buildArrows();
+        _.updateArrows();
+        _.initArrowEvents();
+        _.buildDots();
+        _.updateDots();
+        _.initDotEvents();
+
+        _.checkResponsive(false, true);
+
+        if (_.options.focusOnSelect === true) {
+            $(_.$slideTrack).children().on('click.slick', _.selectHandler);
+        }
+
+        _.setSlideClasses(0);
+
+        _.setPosition();
+
+        _.$slider.trigger('reInit', [_]);
+
+        if (_.options.autoplay === true) {
+            _.focusHandler();
+        }
+
+    };
+
+    Slick.prototype.resize = function() {
+
+        var _ = this;
+
+        if ($(window).width() !== _.windowWidth) {
+            clearTimeout(_.windowDelay);
+            _.windowDelay = window.setTimeout(function() {
+                _.windowWidth = $(window).width();
+                _.checkResponsive();
+                if( !_.unslicked ) { _.setPosition(); }
+            }, 50);
+        }
+    };
+
+    Slick.prototype.removeSlide = Slick.prototype.slickRemove = function(index, removeBefore, removeAll) {
+
+        var _ = this;
+
+        if (typeof(index) === 'boolean') {
+            removeBefore = index;
+            index = removeBefore === true ? 0 : _.slideCount - 1;
+        } else {
+            index = removeBefore === true ? --index : index;
+        }
+
+        if (_.slideCount < 1 || index < 0 || index > _.slideCount - 1) {
+            return false;
+        }
+
+        _.unload();
+
+        if (removeAll === true) {
+            _.$slideTrack.children().remove();
+        } else {
+            _.$slideTrack.children(this.options.slide).eq(index).remove();
+        }
+
+        _.$slides = _.$slideTrack.children(this.options.slide);
+
+        _.$slideTrack.children(this.options.slide).detach();
+
+        _.$slideTrack.append(_.$slides);
+
+        _.$slidesCache = _.$slides;
+
+        _.reinit();
+
+    };
+
+    Slick.prototype.setCSS = function(position) {
+
+        var _ = this,
+            positionProps = {},
+            x, y;
+
+        if (_.options.rtl === true) {
+            position = -position;
+        }
+        x = _.positionProp == 'left' ? Math.ceil(position) + 'px' : '0px';
+        y = _.positionProp == 'top' ? Math.ceil(position) + 'px' : '0px';
+
+        positionProps[_.positionProp] = position;
+
+        if (_.transformsEnabled === false) {
+            _.$slideTrack.css(positionProps);
+        } else {
+            positionProps = {};
+            if (_.cssTransitions === false) {
+                positionProps[_.animType] = 'translate(' + x + ', ' + y + ')';
+                _.$slideTrack.css(positionProps);
+            } else {
+                positionProps[_.animType] = 'translate3d(' + x + ', ' + y + ', 0px)';
+                _.$slideTrack.css(positionProps);
+            }
+        }
+
+    };
+
+    Slick.prototype.setDimensions = function() {
+
+        var _ = this;
+
+        if (_.options.vertical === false) {
+            if (_.options.centerMode === true) {
+                _.$list.css({
+                    padding: ('0px ' + _.options.centerPadding)
+                });
+            }
+        } else {
+            _.$list.height(_.$slides.first().outerHeight(true) * _.options.slidesToShow);
+            if (_.options.centerMode === true) {
+                _.$list.css({
+                    padding: (_.options.centerPadding + ' 0px')
+                });
+            }
+        }
+
+        _.listWidth = _.$list.width();
+        _.listHeight = _.$list.height();
+
+
+        if (_.options.vertical === false && _.options.variableWidth === false) {
+            _.slideWidth = Math.ceil(_.listWidth / _.options.slidesToShow);
+            _.$slideTrack.width(Math.ceil((_.slideWidth * _.$slideTrack.children('.slick-slide').length)));
+
+        } else if (_.options.variableWidth === true) {
+            _.$slideTrack.width(5000 * _.slideCount);
+        } else {
+            _.slideWidth = Math.ceil(_.listWidth);
+            _.$slideTrack.height(Math.ceil((_.$slides.first().outerHeight(true) * _.$slideTrack.children('.slick-slide').length)));
+        }
+
+        var offset = _.$slides.first().outerWidth(true) - _.$slides.first().width();
+        if (_.options.variableWidth === false) _.$slideTrack.children('.slick-slide').width(_.slideWidth - offset);
+
+    };
+
+    Slick.prototype.setFade = function() {
+
+        var _ = this,
+            targetLeft;
+
+        _.$slides.each(function(index, element) {
+            targetLeft = (_.slideWidth * index) * -1;
+            if (_.options.rtl === true) {
+                $(element).css({
+                    position: 'relative',
+                    right: targetLeft,
+                    top: 0,
+                    zIndex: _.options.zIndex - 2,
+                    opacity: 0
+                });
+            } else {
+                $(element).css({
+                    position: 'relative',
+                    left: targetLeft,
+                    top: 0,
+                    zIndex: _.options.zIndex - 2,
+                    opacity: 0
+                });
+            }
+        });
+
+        _.$slides.eq(_.currentSlide).css({
+            zIndex: _.options.zIndex - 1,
+            opacity: 1
+        });
+
+    };
+
+    Slick.prototype.setHeight = function() {
+
+        var _ = this;
+
+        if (_.options.slidesToShow === 1 && _.options.adaptiveHeight === true && _.options.vertical === false) {
+            var targetHeight = _.$slides.eq(_.currentSlide).outerHeight(true);
+            _.$list.css('height', targetHeight);
+        }
+
+    };
+
+    Slick.prototype.setOption = Slick.prototype.slickSetOption = function(option, value, refresh) {
+
+        var _ = this, l, item;
+
+        if( option === "responsive" && $.type(value) === "array" ) {
+            for ( item in value ) {
+                if( $.type( _.options.responsive ) !== "array" ) {
+                    _.options.responsive = [ value[item] ];
+                } else {
+                    l = _.options.responsive.length-1;
+                    // loop through the responsive object and splice out duplicates.
+                    while( l >= 0 ) {
+                        if( _.options.responsive[l].breakpoint === value[item].breakpoint ) {
+                            _.options.responsive.splice(l,1);
+                        }
+                        l--;
+                    }
+                    _.options.responsive.push( value[item] );
+                }
+            }
+        } else {
+            _.options[option] = value;
+        }
+
+        if (refresh === true) {
+            _.unload();
+            _.reinit();
+        }
+
+    };
+
+    Slick.prototype.setPosition = function() {
+
+        var _ = this;
+
+        _.setDimensions();
+
+        _.setHeight();
+
+        if (_.options.fade === false) {
+            _.setCSS(_.getLeft(_.currentSlide));
+        } else {
+            _.setFade();
+        }
+
+        _.$slider.trigger('setPosition', [_]);
+
+    };
+
+    Slick.prototype.setProps = function() {
+
+        var _ = this,
+            bodyStyle = document.body.style;
+
+        _.positionProp = _.options.vertical === true ? 'top' : 'left';
+
+        if (_.positionProp === 'top') {
+            _.$slider.addClass('slick-vertical');
+        } else {
+            _.$slider.removeClass('slick-vertical');
+        }
+
+        if (bodyStyle.WebkitTransition !== undefined ||
+            bodyStyle.MozTransition !== undefined ||
+            bodyStyle.msTransition !== undefined) {
+            if (_.options.useCSS === true) {
+                _.cssTransitions = true;
+            }
+        }
+
+        if ( _.options.fade ) {
+            if ( typeof _.options.zIndex === 'number' ) {
+                if( _.options.zIndex < 3 ) {
+                    _.options.zIndex = 3;
+                }
+            } else {
+                _.options.zIndex = _.defaults.zIndex;
+            }
+        }
+
+        if (bodyStyle.OTransform !== undefined) {
+            _.animType = 'OTransform';
+            _.transformType = '-o-transform';
+            _.transitionType = 'OTransition';
+            if (bodyStyle.perspectiveProperty === undefined && bodyStyle.webkitPerspective === undefined) _.animType = false;
+        }
+        if (bodyStyle.MozTransform !== undefined) {
+            _.animType = 'MozTransform';
+            _.transformType = '-moz-transform';
+            _.transitionType = 'MozTransition';
+            if (bodyStyle.perspectiveProperty === undefined && bodyStyle.MozPerspective === undefined) _.animType = false;
+        }
+        if (bodyStyle.webkitTransform !== undefined) {
+            _.animType = 'webkitTransform';
+            _.transformType = '-webkit-transform';
+            _.transitionType = 'webkitTransition';
+            if (bodyStyle.perspectiveProperty === undefined && bodyStyle.webkitPerspective === undefined) _.animType = false;
+        }
+        if (bodyStyle.msTransform !== undefined) {
+            _.animType = 'msTransform';
+            _.transformType = '-ms-transform';
+            _.transitionType = 'msTransition';
+            if (bodyStyle.msTransform === undefined) _.animType = false;
+        }
+        if (bodyStyle.transform !== undefined && _.animType !== false) {
+            _.animType = 'transform';
+            _.transformType = 'transform';
+            _.transitionType = 'transition';
+        }
+        _.transformsEnabled = _.options.useTransform && (_.animType !== null && _.animType !== false);
+    };
+
+
+    Slick.prototype.setSlideClasses = function(index) {
+
+        var _ = this,
+            centerOffset, allSlides, indexOffset, remainder;
+
+        allSlides = _.$slider
+            .find('.slick-slide')
+            .removeClass('slick-active slick-center slick-current')
+            .attr('aria-hidden', 'true');
+
+        _.$slides
+            .eq(index)
+            .addClass('slick-current');
+
+        if (_.options.centerMode === true) {
+
+            centerOffset = Math.floor(_.options.slidesToShow / 2);
+
+            if (_.options.infinite === true) {
+
+                if (index >= centerOffset && index <= (_.slideCount - 1) - centerOffset) {
+
+                    _.$slides
+                        .slice(index - centerOffset, index + centerOffset + 1)
+                        .addClass('slick-active')
+                        .attr('aria-hidden', 'false');
+
+                } else {
+
+                    indexOffset = _.options.slidesToShow + index;
+                    allSlides
+                        .slice(indexOffset - centerOffset + 1, indexOffset + centerOffset + 2)
+                        .addClass('slick-active')
+                        .attr('aria-hidden', 'false');
+
+                }
+
+                if (index === 0) {
+
+                    allSlides
+                        .eq(allSlides.length - 1 - _.options.slidesToShow)
+                        .addClass('slick-center');
+
+                } else if (index === _.slideCount - 1) {
+
+                    allSlides
+                        .eq(_.options.slidesToShow)
+                        .addClass('slick-center');
+
+                }
+
+            }
+
+            _.$slides
+                .eq(index)
+                .addClass('slick-center');
+
+        } else {
+
+            if (index >= 0 && index <= (_.slideCount - _.options.slidesToShow)) {
+
+                _.$slides
+                    .slice(index, index + _.options.slidesToShow)
+                    .addClass('slick-active')
+                    .attr('aria-hidden', 'false');
+
+            } else if (allSlides.length <= _.options.slidesToShow) {
+
+                allSlides
+                    .addClass('slick-active')
+                    .attr('aria-hidden', 'false');
+
+            } else {
+
+                remainder = _.slideCount % _.options.slidesToShow;
+                indexOffset = _.options.infinite === true ? _.options.slidesToShow + index : index;
+
+                if (_.options.slidesToShow == _.options.slidesToScroll && (_.slideCount - index) < _.options.slidesToShow) {
+
+                    allSlides
+                        .slice(indexOffset - (_.options.slidesToShow - remainder), indexOffset + remainder)
+                        .addClass('slick-active')
+                        .attr('aria-hidden', 'false');
+
+                } else {
+
+                    allSlides
+                        .slice(indexOffset, indexOffset + _.options.slidesToShow)
+                        .addClass('slick-active')
+                        .attr('aria-hidden', 'false');
+
+                }
+
+            }
+
+        }
+
+        if (_.options.lazyLoad === 'ondemand') {
+            _.lazyLoad();
+        }
+
+    };
+
+    Slick.prototype.setupInfinite = function() {
+
+        var _ = this,
+            i, slideIndex, infiniteCount;
+
+        if (_.options.fade === true) {
+            _.options.centerMode = false;
+        }
+
+        if (_.options.infinite === true && _.options.fade === false) {
+
+            slideIndex = null;
+
+            if (_.slideCount > _.options.slidesToShow) {
+
+                if (_.options.centerMode === true) {
+                    infiniteCount = _.options.slidesToShow + 1;
+                } else {
+                    infiniteCount = _.options.slidesToShow;
+                }
+
+                for (i = _.slideCount; i > (_.slideCount -
+                        infiniteCount); i -= 1) {
+                    slideIndex = i - 1;
+                    $(_.$slides[slideIndex]).clone(true).attr('id', '')
+                        .attr('data-slick-index', slideIndex - _.slideCount)
+                        .prependTo(_.$slideTrack).addClass('slick-cloned');
+                }
+                for (i = 0; i < infiniteCount; i += 1) {
+                    slideIndex = i;
+                    $(_.$slides[slideIndex]).clone(true).attr('id', '')
+                        .attr('data-slick-index', slideIndex + _.slideCount)
+                        .appendTo(_.$slideTrack).addClass('slick-cloned');
+                }
+                _.$slideTrack.find('.slick-cloned').find('[id]').each(function() {
+                    $(this).attr('id', '');
+                });
+
+            }
+
+        }
+
+    };
+
+    Slick.prototype.setPaused = function(paused) {
+
+        var _ = this;
+
+        if (_.options.autoplay === true && _.options.pauseOnHover === true) {
+            _.paused = paused;
+            if (!paused) {
+                _.autoPlay();
+            } else {
+                _.autoPlayClear();
+            }
+        }
+    };
+
+    Slick.prototype.selectHandler = function(event) {
+
+        var _ = this;
+
+        var targetElement =
+            $(event.target).is('.slick-slide') ?
+                $(event.target) :
+                $(event.target).parents('.slick-slide');
+
+        var index = parseInt(targetElement.attr('data-slick-index'));
+
+        if (!index) index = 0;
+
+        if (_.slideCount <= _.options.slidesToShow) {
+
+            _.setSlideClasses(index);
+            _.asNavFor(index);
+            return;
+
+        }
+
+        _.slideHandler(index);
+
+    };
+
+    Slick.prototype.slideHandler = function(index, sync, dontAnimate) {
+
+        var targetSlide, animSlide, oldSlide, slideLeft, targetLeft = null,
+            _ = this;
+
+        sync = sync || false;
+
+        if (_.animating === true && _.options.waitForAnimate === true) {
+            return;
+        }
+
+        if (_.options.fade === true && _.currentSlide === index) {
+            return;
+        }
+
+        if (_.slideCount <= _.options.slidesToShow) {
+            return;
+        }
+
+        if (sync === false) {
+            _.asNavFor(index);
+        }
+
+        targetSlide = index;
+        targetLeft = _.getLeft(targetSlide);
+        slideLeft = _.getLeft(_.currentSlide);
+
+        _.currentLeft = _.swipeLeft === null ? slideLeft : _.swipeLeft;
+
+        if (_.options.infinite === false && _.options.centerMode === false && (index < 0 || index > _.getDotCount() * _.options.slidesToScroll)) {
+            if (_.options.fade === false) {
+                targetSlide = _.currentSlide;
+                if (dontAnimate !== true) {
+                    _.animateSlide(slideLeft, function() {
+                        _.postSlide(targetSlide);
+                    });
+                } else {
+                    _.postSlide(targetSlide);
+                }
+            }
+            return;
+        } else if (_.options.infinite === false && _.options.centerMode === true && (index < 0 || index > (_.slideCount - _.options.slidesToScroll))) {
+            if (_.options.fade === false) {
+                targetSlide = _.currentSlide;
+                if (dontAnimate !== true) {
+                    _.animateSlide(slideLeft, function() {
+                        _.postSlide(targetSlide);
+                    });
+                } else {
+                    _.postSlide(targetSlide);
+                }
+            }
+            return;
+        }
+
+        if (_.options.autoplay === true) {
+            clearInterval(_.autoPlayTimer);
+        }
+
+        if (targetSlide < 0) {
+            if (_.slideCount % _.options.slidesToScroll !== 0) {
+                animSlide = _.slideCount - (_.slideCount % _.options.slidesToScroll);
+            } else {
+                animSlide = _.slideCount + targetSlide;
+            }
+        } else if (targetSlide >= _.slideCount) {
+            if (_.slideCount % _.options.slidesToScroll !== 0) {
+                animSlide = 0;
+            } else {
+                animSlide = targetSlide - _.slideCount;
+            }
+        } else {
+            animSlide = targetSlide;
+        }
+
+        _.animating = true;
+
+        _.$slider.trigger('beforeChange', [_, _.currentSlide, animSlide]);
+
+        oldSlide = _.currentSlide;
+        _.currentSlide = animSlide;
+
+        _.setSlideClasses(_.currentSlide);
+
+        _.updateDots();
+        _.updateArrows();
+
+        if (_.options.fade === true) {
+            if (dontAnimate !== true) {
+
+                _.fadeSlideOut(oldSlide);
+
+                _.fadeSlide(animSlide, function() {
+                    _.postSlide(animSlide);
+                });
+
+            } else {
+                _.postSlide(animSlide);
+            }
+            _.animateHeight();
+            return;
+        }
+
+        if (dontAnimate !== true) {
+            _.animateSlide(targetLeft, function() {
+                _.postSlide(animSlide);
+            });
+        } else {
+            _.postSlide(animSlide);
+        }
+
+    };
+
+    Slick.prototype.startLoad = function() {
+
+        var _ = this;
+
+        if (_.options.arrows === true && _.slideCount > _.options.slidesToShow) {
+
+            _.$prevArrow.hide();
+            _.$nextArrow.hide();
+
+        }
+
+        if (_.options.dots === true && _.slideCount > _.options.slidesToShow) {
+
+            _.$dots.hide();
+
+        }
+
+        _.$slider.addClass('slick-loading');
+
+    };
+
+    Slick.prototype.swipeDirection = function() {
+
+        var xDist, yDist, r, swipeAngle, _ = this;
+
+        xDist = _.touchObject.startX - _.touchObject.curX;
+        yDist = _.touchObject.startY - _.touchObject.curY;
+        r = Math.atan2(yDist, xDist);
+
+        swipeAngle = Math.round(r * 180 / Math.PI);
+        if (swipeAngle < 0) {
+            swipeAngle = 360 - Math.abs(swipeAngle);
+        }
+
+        if ((swipeAngle <= 45) && (swipeAngle >= 0)) {
+            return (_.options.rtl === false ? 'left' : 'right');
+        }
+        if ((swipeAngle <= 360) && (swipeAngle >= 315)) {
+            return (_.options.rtl === false ? 'left' : 'right');
+        }
+        if ((swipeAngle >= 135) && (swipeAngle <= 225)) {
+            return (_.options.rtl === false ? 'right' : 'left');
+        }
+        if (_.options.verticalSwiping === true) {
+            if ((swipeAngle >= 35) && (swipeAngle <= 135)) {
+                return 'left';
+            } else {
+                return 'right';
+            }
+        }
+
+        return 'vertical';
+
+    };
+
+    Slick.prototype.swipeEnd = function(event) {
+
+        var _ = this,
+            slideCount;
+
+        _.dragging = false;
+
+        _.shouldClick = (_.touchObject.swipeLength > 10) ? false : true;
+
+        if (_.touchObject.curX === undefined) {
+            return false;
+        }
+
+        if (_.touchObject.edgeHit === true) {
+            _.$slider.trigger('edge', [_, _.swipeDirection()]);
+        }
+
+        if (_.touchObject.swipeLength >= _.touchObject.minSwipe) {
+
+            switch (_.swipeDirection()) {
+                case 'left':
+                    slideCount = _.options.swipeToSlide ? _.checkNavigable(_.currentSlide + _.getSlideCount()) : _.currentSlide + _.getSlideCount();
+                    _.slideHandler(slideCount);
+                    _.currentDirection = 0;
+                    _.touchObject = {};
+                    _.$slider.trigger('swipe', [_, 'left']);
+                    break;
+
+                case 'right':
+                    slideCount = _.options.swipeToSlide ? _.checkNavigable(_.currentSlide - _.getSlideCount()) : _.currentSlide - _.getSlideCount();
+                    _.slideHandler(slideCount);
+                    _.currentDirection = 1;
+                    _.touchObject = {};
+                    _.$slider.trigger('swipe', [_, 'right']);
+                    break;
+            }
+        } else {
+            if (_.touchObject.startX !== _.touchObject.curX) {
+                _.slideHandler(_.currentSlide);
+                _.touchObject = {};
+            }
+        }
+
+    };
+
+    Slick.prototype.swipeHandler = function(event) {
+
+        var _ = this;
+
+        if ((_.options.swipe === false) || ('ontouchend' in document && _.options.swipe === false)) {
+            return;
+        } else if (_.options.draggable === false && event.type.indexOf('mouse') !== -1) {
+            return;
+        }
+
+        _.touchObject.fingerCount = event.originalEvent && event.originalEvent.touches !== undefined ?
+            event.originalEvent.touches.length : 1;
+
+        _.touchObject.minSwipe = _.listWidth / _.options
+            .touchThreshold;
+
+        if (_.options.verticalSwiping === true) {
+            _.touchObject.minSwipe = _.listHeight / _.options
+                .touchThreshold;
+        }
+
+        switch (event.data.action) {
+
+            case 'start':
+                _.swipeStart(event);
+                break;
+
+            case 'move':
+                _.swipeMove(event);
+                break;
+
+            case 'end':
+                _.swipeEnd(event);
+                break;
+
+        }
+
+    };
+
+    Slick.prototype.swipeMove = function(event) {
+
+        var _ = this,
+            edgeWasHit = false,
+            curLeft, swipeDirection, swipeLength, positionOffset, touches;
+
+        touches = event.originalEvent !== undefined ? event.originalEvent.touches : null;
+
+        if (!_.dragging || touches && touches.length !== 1) {
+            return false;
+        }
+
+        curLeft = _.getLeft(_.currentSlide);
+
+        _.touchObject.curX = touches !== undefined ? touches[0].pageX : event.clientX;
+        _.touchObject.curY = touches !== undefined ? touches[0].pageY : event.clientY;
+
+        _.touchObject.swipeLength = Math.round(Math.sqrt(
+            Math.pow(_.touchObject.curX - _.touchObject.startX, 2)));
+
+        if (_.options.verticalSwiping === true) {
+            _.touchObject.swipeLength = Math.round(Math.sqrt(
+                Math.pow(_.touchObject.curY - _.touchObject.startY, 2)));
+        }
+
+        swipeDirection = _.swipeDirection();
+
+        if (swipeDirection === 'vertical') {
+            return;
+        }
+
+        if (event.originalEvent !== undefined && _.touchObject.swipeLength > 4) {
+            event.preventDefault();
+        }
+
+        positionOffset = (_.options.rtl === false ? 1 : -1) * (_.touchObject.curX > _.touchObject.startX ? 1 : -1);
+        if (_.options.verticalSwiping === true) {
+            positionOffset = _.touchObject.curY > _.touchObject.startY ? 1 : -1;
+        }
+
+
+        swipeLength = _.touchObject.swipeLength;
+
+        _.touchObject.edgeHit = false;
+
+        if (_.options.infinite === false) {
+            if ((_.currentSlide === 0 && swipeDirection === 'right') || (_.currentSlide >= _.getDotCount() && swipeDirection === 'left')) {
+                swipeLength = _.touchObject.swipeLength * _.options.edgeFriction;
+                _.touchObject.edgeHit = true;
+            }
+        }
+
+        if (_.options.vertical === false) {
+            _.swipeLeft = curLeft + swipeLength * positionOffset;
+        } else {
+            _.swipeLeft = curLeft + (swipeLength * (_.$list.height() / _.listWidth)) * positionOffset;
+        }
+        if (_.options.verticalSwiping === true) {
+            _.swipeLeft = curLeft + swipeLength * positionOffset;
+        }
+
+        if (_.options.fade === true || _.options.touchMove === false) {
+            return false;
+        }
+
+        if (_.animating === true) {
+            _.swipeLeft = null;
+            return false;
+        }
+
+        _.setCSS(_.swipeLeft);
+
+    };
+
+    Slick.prototype.swipeStart = function(event) {
+
+        var _ = this,
+            touches;
+
+        if (_.touchObject.fingerCount !== 1 || _.slideCount <= _.options.slidesToShow) {
+            _.touchObject = {};
+            return false;
+        }
+
+        if (event.originalEvent !== undefined && event.originalEvent.touches !== undefined) {
+            touches = event.originalEvent.touches[0];
+        }
+
+        _.touchObject.startX = _.touchObject.curX = touches !== undefined ? touches.pageX : event.clientX;
+        _.touchObject.startY = _.touchObject.curY = touches !== undefined ? touches.pageY : event.clientY;
+
+        _.dragging = true;
+
+    };
+
+    Slick.prototype.unfilterSlides = Slick.prototype.slickUnfilter = function() {
+
+        var _ = this;
+
+        if (_.$slidesCache !== null) {
+
+            _.unload();
+
+            _.$slideTrack.children(this.options.slide).detach();
+
+            _.$slidesCache.appendTo(_.$slideTrack);
+
+            _.reinit();
+
+        }
+
+    };
+
+    Slick.prototype.unload = function() {
+
+        var _ = this;
+
+        $('.slick-cloned', _.$slider).remove();
+
+        if (_.$dots) {
+            _.$dots.remove();
+        }
+
+        if (_.$prevArrow && _.htmlExpr.test(_.options.prevArrow)) {
+            _.$prevArrow.remove();
+        }
+
+        if (_.$nextArrow && _.htmlExpr.test(_.options.nextArrow)) {
+            _.$nextArrow.remove();
+        }
+
+        _.$slides
+            .removeClass('slick-slide slick-active slick-visible slick-current')
+            .attr('aria-hidden', 'true')
+            .css('width', '');
+
+    };
+
+    Slick.prototype.unslick = function(fromBreakpoint) {
+
+        var _ = this;
+        _.$slider.trigger('unslick', [_, fromBreakpoint]);
+        _.destroy();
+
+    };
+
+    Slick.prototype.updateArrows = function() {
+
+        var _ = this,
+            centerOffset;
+
+        centerOffset = Math.floor(_.options.slidesToShow / 2);
+
+        if ( _.options.arrows === true &&
+            _.slideCount > _.options.slidesToShow &&
+            !_.options.infinite ) {
+
+            _.$prevArrow.removeClass('slick-disabled').attr('aria-disabled', 'false');
+            _.$nextArrow.removeClass('slick-disabled').attr('aria-disabled', 'false');
+
+            if (_.currentSlide === 0) {
+
+                _.$prevArrow.addClass('slick-disabled').attr('aria-disabled', 'true');
+                _.$nextArrow.removeClass('slick-disabled').attr('aria-disabled', 'false');
+
+            } else if (_.currentSlide >= _.slideCount - _.options.slidesToShow && _.options.centerMode === false) {
+
+                _.$nextArrow.addClass('slick-disabled').attr('aria-disabled', 'true');
+                _.$prevArrow.removeClass('slick-disabled').attr('aria-disabled', 'false');
+
+            } else if (_.currentSlide >= _.slideCount - 1 && _.options.centerMode === true) {
+
+                _.$nextArrow.addClass('slick-disabled').attr('aria-disabled', 'true');
+                _.$prevArrow.removeClass('slick-disabled').attr('aria-disabled', 'false');
+
+            }
+
+        }
+
+    };
+
+    Slick.prototype.updateDots = function() {
+
+        var _ = this;
+
+        if (_.$dots !== null) {
+
+            _.$dots
+                .find('li')
+                .removeClass('slick-active')
+                .attr('aria-hidden', 'true');
+
+            _.$dots
+                .find('li')
+                .eq(Math.floor(_.currentSlide / _.options.slidesToScroll))
+                .addClass('slick-active')
+                .attr('aria-hidden', 'false');
+
+        }
+
+    };
+
+    Slick.prototype.visibility = function() {
+
+        var _ = this;
+
+        if (document[_.hidden]) {
+            _.paused = true;
+            _.autoPlayClear();
+        } else {
+            if (_.options.autoplay === true) {
+                _.paused = false;
+                _.autoPlay();
+            }
+        }
+
+    };
+    Slick.prototype.initADA = function() {
+        var _ = this;
+        _.$slides.add(_.$slideTrack.find('.slick-cloned')).attr({
+            'aria-hidden': 'true',
+            'tabindex': '-1'
+        }).find('a, input, button, select').attr({
+            'tabindex': '-1'
+        });
+
+        _.$slideTrack.attr('role', 'listbox');
+
+        _.$slides.not(_.$slideTrack.find('.slick-cloned')).each(function(i) {
+            $(this).attr({
+                'role': 'option',
+                'aria-describedby': 'slick-slide' + _.instanceUid + i + ''
+            });
+        });
+
+        if (_.$dots !== null) {
+            _.$dots.attr('role', 'tablist').find('li').each(function(i) {
+                $(this).attr({
+                    'role': 'presentation',
+                    'aria-selected': 'false',
+                    'aria-controls': 'navigation' + _.instanceUid + i + '',
+                    'id': 'slick-slide' + _.instanceUid + i + ''
+                });
+            })
+                .first().attr('aria-selected', 'true').end()
+                .find('button').attr('role', 'button').end()
+                .closest('div').attr('role', 'toolbar');
+        }
+        _.activateADA();
+
+    };
+
+    Slick.prototype.activateADA = function() {
+        var _ = this;
+
+        _.$slideTrack.find('.slick-active').attr({
+            'aria-hidden': 'false'
+        }).find('a, input, button, select').attr({
+            'tabindex': '0'
+        });
+
+    };
+
+    Slick.prototype.focusHandler = function() {
+        var _ = this;
+        _.$slider.on('focus.slick blur.slick', '*', function(event) {
+            event.stopImmediatePropagation();
+            var sf = $(this);
+            setTimeout(function() {
+                if (_.isPlay) {
+                    if (sf.is(':focus')) {
+                        _.autoPlayClear();
+                        _.paused = true;
+                    } else {
+                        _.paused = false;
+                        _.autoPlay();
+                    }
+                }
+            }, 0);
+        });
+    };
+
+    $.fn.slick = function() {
+        var _ = this,
+            opt = arguments[0],
+            args = Array.prototype.slice.call(arguments, 1),
+            l = _.length,
+            i,
+            ret;
+        for (i = 0; i < l; i++) {
+            if (typeof opt == 'object' || typeof opt == 'undefined')
+                _[i].slick = new Slick(_[i], opt);
+            else
+                ret = _[i].slick[opt].apply(_[i].slick, args);
+            if (typeof ret != 'undefined') return ret;
+        }
+        return _;
+    };
+
+}));
+
+},{"jquery":1}],4:[function(require,module,exports){
+'use strict';
+
+var babelHelpers = {};
+
+babelHelpers.classCallCheck = function (instance, Constructor) {
+  if (!(instance instanceof Constructor)) {
+    throw new TypeError("Cannot call a class as a function");
+  }
+};
+function Target(path, matcher, delegate) {
+  this.path = path;
+  this.matcher = matcher;
+  this.delegate = delegate;
+}
+
+Target.prototype = {
+  to: function to(target, callback) {
+    var delegate = this.delegate;
+
+    if (delegate && delegate.willAddRoute) {
+      target = delegate.willAddRoute(this.matcher.target, target);
+    }
+
+    this.matcher.add(this.path, target);
+
+    if (callback) {
+      if (callback.length === 0) {
+        throw new Error("You must have an argument in the function passed to `to`");
+      }
+      this.matcher.addChild(this.path, target, callback, this.delegate);
+    }
+    return this;
+  }
+};
+
+function Matcher(target) {
+  this.routes = {};
+  this.children = {};
+  this.target = target;
+}
+
+Matcher.prototype = {
+  add: function add(path, handler) {
+    this.routes[path] = handler;
+  },
+
+  addChild: function addChild(path, target, callback, delegate) {
+    var matcher = new Matcher(target);
+    this.children[path] = matcher;
+
+    var match = generateMatch(path, matcher, delegate);
+
+    if (delegate && delegate.contextEntered) {
+      delegate.contextEntered(target, match);
+    }
+
+    callback(match);
+  }
+};
+
+function generateMatch(startingPath, matcher, delegate) {
+  return function (path, nestedCallback) {
+    var fullPath = startingPath + path;
+
+    if (nestedCallback) {
+      nestedCallback(generateMatch(fullPath, matcher, delegate));
+    } else {
+      return new Target(startingPath + path, matcher, delegate);
+    }
+  };
+}
+
+function addRoute(routeArray, path, handler) {
+  var len = 0;
+  for (var i = 0, l = routeArray.length; i < l; i++) {
+    len += routeArray[i].path.length;
+  }
+
+  path = path.substr(len);
+  var route = { path: path, handler: handler };
+  routeArray.push(route);
+}
+
+function eachRoute(baseRoute, matcher, callback, binding) {
+  var routes = matcher.routes;
+
+  for (var path in routes) {
+    if (routes.hasOwnProperty(path)) {
+      var routeArray = baseRoute.slice();
+      addRoute(routeArray, path, routes[path]);
+
+      if (matcher.children[path]) {
+        eachRoute(routeArray, matcher.children[path], callback, binding);
+      } else {
+        callback.call(binding, routeArray);
+      }
+    }
+  }
+}
+
+function map (callback, addRouteCallback) {
+  var matcher = new Matcher();
+
+  callback(generateMatch("", matcher, this.delegate));
+
+  eachRoute([], matcher, function (route) {
+    if (addRouteCallback) {
+      addRouteCallback(this, route);
+    } else {
+      this.add(route);
+    }
+  }, this);
+}
+
+var specials = ['/', '.', '*', '+', '?', '|', '(', ')', '[', ']', '{', '}', '\\'];
+
+var escapeRegex = new RegExp('(\\' + specials.join('|\\') + ')', 'g');
+
+function isArray(test) {
+  return Object.prototype.toString.call(test) === "[object Array]";
+}
+
+// A Segment represents a segment in the original route description.
+// Each Segment type provides an `eachChar` and `regex` method.
+//
+// The `eachChar` method invokes the callback with one or more character
+// specifications. A character specification consumes one or more input
+// characters.
+//
+// The `regex` method returns a regex fragment for the segment. If the
+// segment is a dynamic of star segment, the regex fragment also includes
+// a capture.
+//
+// A character specification contains:
+//
+// * `validChars`: a String with a list of all valid characters, or
+// * `invalidChars`: a String with a list of all invalid characters
+// * `repeat`: true if the character specification can repeat
+
+function StaticSegment(string) {
+  this.string = string;
+}
+StaticSegment.prototype = {
+  eachChar: function eachChar(callback) {
+    var string = this.string,
+        ch;
+
+    for (var i = 0, l = string.length; i < l; i++) {
+      ch = string.charAt(i);
+      callback({ validChars: ch });
+    }
+  },
+
+  regex: function regex() {
+    return this.string.replace(escapeRegex, '\\$1');
+  },
+
+  generate: function generate() {
+    return this.string;
+  }
+};
+
+function DynamicSegment(name) {
+  this.name = name;
+}
+DynamicSegment.prototype = {
+  eachChar: function eachChar(callback) {
+    callback({ invalidChars: "/", repeat: true });
+  },
+
+  regex: function regex() {
+    return "([^/]+)";
+  },
+
+  generate: function generate(params) {
+    return params[this.name];
+  }
+};
+
+function StarSegment(name) {
+  this.name = name;
+}
+StarSegment.prototype = {
+  eachChar: function eachChar(callback) {
+    callback({ invalidChars: "", repeat: true });
+  },
+
+  regex: function regex() {
+    return "(.+)";
+  },
+
+  generate: function generate(params) {
+    return params[this.name];
+  }
+};
+
+function EpsilonSegment() {}
+EpsilonSegment.prototype = {
+  eachChar: function eachChar() {},
+  regex: function regex() {
+    return "";
+  },
+  generate: function generate() {
+    return "";
+  }
+};
+
+function parse(route, names, specificity) {
+  // normalize route as not starting with a "/". Recognition will
+  // also normalize.
+  if (route.charAt(0) === "/") {
+    route = route.substr(1);
+  }
+
+  var segments = route.split("/"),
+      results = [];
+
+  // A routes has specificity determined by the order that its different segments
+  // appear in. This system mirrors how the magnitude of numbers written as strings
+  // works.
+  // Consider a number written as: "abc". An example would be "200". Any other number written
+  // "xyz" will be smaller than "abc" so long as `a > z`. For instance, "199" is smaller
+  // then "200", even though "y" and "z" (which are both 9) are larger than "0" (the value
+  // of (`b` and `c`). This is because the leading symbol, "2", is larger than the other
+  // leading symbol, "1".
+  // The rule is that symbols to the left carry more weight than symbols to the right
+  // when a number is written out as a string. In the above strings, the leading digit
+  // represents how many 100's are in the number, and it carries more weight than the middle
+  // number which represents how many 10's are in the number.
+  // This system of number magnitude works well for route specificity, too. A route written as
+  // `a/b/c` will be more specific than `x/y/z` as long as `a` is more specific than
+  // `x`, irrespective of the other parts.
+  // Because of this similarity, we assign each type of segment a number value written as a
+  // string. We can find the specificity of compound routes by concatenating these strings
+  // together, from left to right. After we have looped through all of the segments,
+  // we convert the string to a number.
+  specificity.val = '';
+
+  for (var i = 0, l = segments.length; i < l; i++) {
+    var segment = segments[i],
+        match;
+
+    if (match = segment.match(/^:([^\/]+)$/)) {
+      results.push(new DynamicSegment(match[1]));
+      names.push(match[1]);
+      specificity.val += '3';
+    } else if (match = segment.match(/^\*([^\/]+)$/)) {
+      results.push(new StarSegment(match[1]));
+      specificity.val += '2';
+      names.push(match[1]);
+    } else if (segment === "") {
+      results.push(new EpsilonSegment());
+      specificity.val += '1';
+    } else {
+      results.push(new StaticSegment(segment));
+      specificity.val += '4';
+    }
+  }
+
+  specificity.val = +specificity.val;
+
+  return results;
+}
+
+// A State has a character specification and (`charSpec`) and a list of possible
+// subsequent states (`nextStates`).
+//
+// If a State is an accepting state, it will also have several additional
+// properties:
+//
+// * `regex`: A regular expression that is used to extract parameters from paths
+//   that reached this accepting state.
+// * `handlers`: Information on how to convert the list of captures into calls
+//   to registered handlers with the specified parameters
+// * `types`: How many static, dynamic or star segments in this route. Used to
+//   decide which route to use if multiple registered routes match a path.
+//
+// Currently, State is implemented naively by looping over `nextStates` and
+// comparing a character specification against a character. A more efficient
+// implementation would use a hash of keys pointing at one or more next states.
+
+function State(charSpec) {
+  this.charSpec = charSpec;
+  this.nextStates = [];
+}
+
+State.prototype = {
+  get: function get(charSpec) {
+    var nextStates = this.nextStates;
+
+    for (var i = 0, l = nextStates.length; i < l; i++) {
+      var child = nextStates[i];
+
+      var isEqual = child.charSpec.validChars === charSpec.validChars;
+      isEqual = isEqual && child.charSpec.invalidChars === charSpec.invalidChars;
+
+      if (isEqual) {
+        return child;
+      }
+    }
+  },
+
+  put: function put(charSpec) {
+    var state;
+
+    // If the character specification already exists in a child of the current
+    // state, just return that state.
+    if (state = this.get(charSpec)) {
+      return state;
+    }
+
+    // Make a new state for the character spec
+    state = new State(charSpec);
+
+    // Insert the new state as a child of the current state
+    this.nextStates.push(state);
+
+    // If this character specification repeats, insert the new state as a child
+    // of itself. Note that this will not trigger an infinite loop because each
+    // transition during recognition consumes a character.
+    if (charSpec.repeat) {
+      state.nextStates.push(state);
+    }
+
+    // Return the new state
+    return state;
+  },
+
+  // Find a list of child states matching the next character
+  match: function match(ch) {
+    // DEBUG "Processing `" + ch + "`:"
+    var nextStates = this.nextStates,
+        child,
+        charSpec,
+        chars;
+
+    // DEBUG "  " + debugState(this)
+    var returned = [];
+
+    for (var i = 0, l = nextStates.length; i < l; i++) {
+      child = nextStates[i];
+
+      charSpec = child.charSpec;
+
+      if (typeof (chars = charSpec.validChars) !== 'undefined') {
+        if (chars.indexOf(ch) !== -1) {
+          returned.push(child);
+        }
+      } else if (typeof (chars = charSpec.invalidChars) !== 'undefined') {
+        if (chars.indexOf(ch) === -1) {
+          returned.push(child);
+        }
+      }
+    }
+
+    return returned;
+  }
+
+  /** IF DEBUG
+  , debug: function() {
+    var charSpec = this.charSpec,
+        debug = "[",
+        chars = charSpec.validChars || charSpec.invalidChars;
+     if (charSpec.invalidChars) { debug += "^"; }
+    debug += chars;
+    debug += "]";
+     if (charSpec.repeat) { debug += "+"; }
+     return debug;
+  }
+  END IF **/
+};
+
+/** IF DEBUG
+function debug(log) {
+  console.log(log);
+}
+
+function debugState(state) {
+  return state.nextStates.map(function(n) {
+    if (n.nextStates.length === 0) { return "( " + n.debug() + " [accepting] )"; }
+    return "( " + n.debug() + " <then> " + n.nextStates.map(function(s) { return s.debug() }).join(" or ") + " )";
+  }).join(", ")
+}
+END IF **/
+
+// Sort the routes by specificity
+function sortSolutions(states) {
+  return states.sort(function (a, b) {
+    return b.specificity.val - a.specificity.val;
+  });
+}
+
+function recognizeChar(states, ch) {
+  var nextStates = [];
+
+  for (var i = 0, l = states.length; i < l; i++) {
+    var state = states[i];
+
+    nextStates = nextStates.concat(state.match(ch));
+  }
+
+  return nextStates;
+}
+
+var oCreate = Object.create || function (proto) {
+  function F() {}
+  F.prototype = proto;
+  return new F();
+};
+
+function RecognizeResults(queryParams) {
+  this.queryParams = queryParams || {};
+}
+RecognizeResults.prototype = oCreate({
+  splice: Array.prototype.splice,
+  slice: Array.prototype.slice,
+  push: Array.prototype.push,
+  length: 0,
+  queryParams: null
+});
+
+function findHandler(state, path, queryParams) {
+  var handlers = state.handlers,
+      regex = state.regex;
+  var captures = path.match(regex),
+      currentCapture = 1;
+  var result = new RecognizeResults(queryParams);
+
+  for (var i = 0, l = handlers.length; i < l; i++) {
+    var handler = handlers[i],
+        names = handler.names,
+        params = {};
+
+    for (var j = 0, m = names.length; j < m; j++) {
+      params[names[j]] = captures[currentCapture++];
+    }
+
+    result.push({ handler: handler.handler, params: params, isDynamic: !!names.length });
+  }
+
+  return result;
+}
+
+function addSegment(currentState, segment) {
+  segment.eachChar(function (ch) {
+    var state;
+
+    currentState = currentState.put(ch);
+  });
+
+  return currentState;
+}
+
+function decodeQueryParamPart(part) {
+  // http://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1
+  part = part.replace(/\+/gm, '%20');
+  return decodeURIComponent(part);
+}
+
+// The main interface
+
+var RouteRecognizer = function RouteRecognizer() {
+  this.rootState = new State();
+  this.names = {};
+};
+
+RouteRecognizer.prototype = {
+  add: function add(routes, options) {
+    var currentState = this.rootState,
+        regex = "^",
+        specificity = {},
+        handlers = [],
+        allSegments = [],
+        name;
+
+    var isEmpty = true;
+
+    for (var i = 0, l = routes.length; i < l; i++) {
+      var route = routes[i],
+          names = [];
+
+      var segments = parse(route.path, names, specificity);
+
+      allSegments = allSegments.concat(segments);
+
+      for (var j = 0, m = segments.length; j < m; j++) {
+        var segment = segments[j];
+
+        if (segment instanceof EpsilonSegment) {
+          continue;
+        }
+
+        isEmpty = false;
+
+        // Add a "/" for the new segment
+        currentState = currentState.put({ validChars: "/" });
+        regex += "/";
+
+        // Add a representation of the segment to the NFA and regex
+        currentState = addSegment(currentState, segment);
+        regex += segment.regex();
+      }
+
+      var handler = { handler: route.handler, names: names };
+      handlers.push(handler);
+    }
+
+    if (isEmpty) {
+      currentState = currentState.put({ validChars: "/" });
+      regex += "/";
+    }
+
+    currentState.handlers = handlers;
+    currentState.regex = new RegExp(regex + "$");
+    currentState.specificity = specificity;
+
+    if (name = options && options.as) {
+      this.names[name] = {
+        segments: allSegments,
+        handlers: handlers
+      };
+    }
+  },
+
+  handlersFor: function handlersFor(name) {
+    var route = this.names[name],
+        result = [];
+    if (!route) {
+      throw new Error("There is no route named " + name);
+    }
+
+    for (var i = 0, l = route.handlers.length; i < l; i++) {
+      result.push(route.handlers[i]);
+    }
+
+    return result;
+  },
+
+  hasRoute: function hasRoute(name) {
+    return !!this.names[name];
+  },
+
+  generate: function generate(name, params) {
+    var route = this.names[name],
+        output = "";
+    if (!route) {
+      throw new Error("There is no route named " + name);
+    }
+
+    var segments = route.segments;
+
+    for (var i = 0, l = segments.length; i < l; i++) {
+      var segment = segments[i];
+
+      if (segment instanceof EpsilonSegment) {
+        continue;
+      }
+
+      output += "/";
+      output += segment.generate(params);
+    }
+
+    if (output.charAt(0) !== '/') {
+      output = '/' + output;
+    }
+
+    if (params && params.queryParams) {
+      output += this.generateQueryString(params.queryParams);
+    }
+
+    return output;
+  },
+
+  generateQueryString: function generateQueryString(params) {
+    var pairs = [];
+    var keys = [];
+    for (var key in params) {
+      if (params.hasOwnProperty(key)) {
+        keys.push(key);
+      }
+    }
+    keys.sort();
+    for (var i = 0, len = keys.length; i < len; i++) {
+      key = keys[i];
+      var value = params[key];
+      if (value == null) {
+        continue;
+      }
+      var pair = encodeURIComponent(key);
+      if (isArray(value)) {
+        for (var j = 0, l = value.length; j < l; j++) {
+          var arrayPair = key + '[]' + '=' + encodeURIComponent(value[j]);
+          pairs.push(arrayPair);
+        }
+      } else {
+        pair += "=" + encodeURIComponent(value);
+        pairs.push(pair);
+      }
+    }
+
+    if (pairs.length === 0) {
+      return '';
+    }
+
+    return "?" + pairs.join("&");
+  },
+
+  parseQueryString: function parseQueryString(queryString) {
+    var pairs = queryString.split("&"),
+        queryParams = {};
+    for (var i = 0; i < pairs.length; i++) {
+      var pair = pairs[i].split('='),
+          key = decodeQueryParamPart(pair[0]),
+          keyLength = key.length,
+          isArray = false,
+          value;
+      if (pair.length === 1) {
+        value = 'true';
+      } else {
+        //Handle arrays
+        if (keyLength > 2 && key.slice(keyLength - 2) === '[]') {
+          isArray = true;
+          key = key.slice(0, keyLength - 2);
+          if (!queryParams[key]) {
+            queryParams[key] = [];
+          }
+        }
+        value = pair[1] ? decodeQueryParamPart(pair[1]) : '';
+      }
+      if (isArray) {
+        queryParams[key].push(value);
+      } else {
+        queryParams[key] = value;
+      }
+    }
+    return queryParams;
+  },
+
+  recognize: function recognize(path) {
+    var states = [this.rootState],
+        pathLen,
+        i,
+        l,
+        queryStart,
+        queryParams = {},
+        isSlashDropped = false;
+
+    queryStart = path.indexOf('?');
+    if (queryStart !== -1) {
+      var queryString = path.substr(queryStart + 1, path.length);
+      path = path.substr(0, queryStart);
+      queryParams = this.parseQueryString(queryString);
+    }
+
+    path = decodeURI(path);
+
+    // DEBUG GROUP path
+
+    if (path.charAt(0) !== "/") {
+      path = "/" + path;
+    }
+
+    pathLen = path.length;
+    if (pathLen > 1 && path.charAt(pathLen - 1) === "/") {
+      path = path.substr(0, pathLen - 1);
+      isSlashDropped = true;
+    }
+
+    for (i = 0, l = path.length; i < l; i++) {
+      states = recognizeChar(states, path.charAt(i));
+      if (!states.length) {
+        break;
+      }
+    }
+
+    // END DEBUG GROUP
+
+    var solutions = [];
+    for (i = 0, l = states.length; i < l; i++) {
+      if (states[i].handlers) {
+        solutions.push(states[i]);
+      }
+    }
+
+    states = sortSolutions(solutions);
+
+    var state = solutions[0];
+
+    if (state && state.handlers) {
+      // if a trailing slash was dropped and a star segment is the last segment
+      // specified, put the trailing slash back
+      if (isSlashDropped && state.regex.source.slice(-5) === "(.+)$") {
+        path = path + "/";
+      }
+      return findHandler(state, path, queryParams);
+    }
+  }
+};
+
+RouteRecognizer.prototype.map = map;
+
+RouteRecognizer.VERSION = '0.1.9';
+
+var genQuery = RouteRecognizer.prototype.generateQueryString;
+
+// export default for holding the Vue reference
+var exports$1 = {};
+/**
+ * Warn stuff.
+ *
+ * @param {String} msg
+ */
+
+function warn(msg) {
+  /* istanbul ignore next */
+  if (window.console) {
+    console.warn('[vue-router] ' + msg);
+    /* istanbul ignore if */
+    if (!exports$1.Vue || exports$1.Vue.config.debug) {
+      console.warn(new Error('warning stack trace:').stack);
+    }
+  }
+}
+
+/**
+ * Resolve a relative path.
+ *
+ * @param {String} base
+ * @param {String} relative
+ * @param {Boolean} append
+ * @return {String}
+ */
+
+function resolvePath(base, relative, append) {
+  var query = base.match(/(\?.*)$/);
+  if (query) {
+    query = query[1];
+    base = base.slice(0, -query.length);
+  }
+  // a query!
+  if (relative.charAt(0) === '?') {
+    return base + relative;
+  }
+  var stack = base.split('/');
+  // remove trailing segment if:
+  // - not appending
+  // - appending to trailing slash (last segment is empty)
+  if (!append || !stack[stack.length - 1]) {
+    stack.pop();
+  }
+  // resolve relative path
+  var segments = relative.replace(/^\//, '').split('/');
+  for (var i = 0; i < segments.length; i++) {
+    var segment = segments[i];
+    if (segment === '.') {
+      continue;
+    } else if (segment === '..') {
+      stack.pop();
+    } else {
+      stack.push(segment);
+    }
+  }
+  // ensure leading slash
+  if (stack[0] !== '') {
+    stack.unshift('');
+  }
+  return stack.join('/');
+}
+
+/**
+ * Forgiving check for a promise
+ *
+ * @param {Object} p
+ * @return {Boolean}
+ */
+
+function isPromise(p) {
+  return p && typeof p.then === 'function';
+}
+
+/**
+ * Retrive a route config field from a component instance
+ * OR a component contructor.
+ *
+ * @param {Function|Vue} component
+ * @param {String} name
+ * @return {*}
+ */
+
+function getRouteConfig(component, name) {
+  var options = component && (component.$options || component.options);
+  return options && options.route && options.route[name];
+}
+
+/**
+ * Resolve an async component factory. Have to do a dirty
+ * mock here because of Vue core's internal API depends on
+ * an ID check.
+ *
+ * @param {Object} handler
+ * @param {Function} cb
+ */
+
+var resolver = undefined;
+
+function resolveAsyncComponent(handler, cb) {
+  if (!resolver) {
+    resolver = {
+      resolve: exports$1.Vue.prototype._resolveComponent,
+      $options: {
+        components: {
+          _: handler.component
+        }
+      }
+    };
+  } else {
+    resolver.$options.components._ = handler.component;
+  }
+  resolver.resolve('_', function (Component) {
+    handler.component = Component;
+    cb(Component);
+  });
+}
+
+/**
+ * Map the dynamic segments in a path to params.
+ *
+ * @param {String} path
+ * @param {Object} params
+ * @param {Object} query
+ */
+
+function mapParams(path, params, query) {
+  if (params === undefined) params = {};
+
+  path = path.replace(/:([^\/]+)/g, function (_, key) {
+    var val = params[key];
+    if (!val) {
+      warn('param "' + key + '" not found when generating ' + 'path for "' + path + '" with params ' + JSON.stringify(params));
+    }
+    return val || '';
+  });
+  if (query) {
+    path += genQuery(query);
+  }
+  return path;
+}
+
+var hashRE = /#.*$/;
+
+var HTML5History = (function () {
+  function HTML5History(_ref) {
+    var root = _ref.root;
+    var onChange = _ref.onChange;
+    babelHelpers.classCallCheck(this, HTML5History);
+
+    if (root) {
+      // make sure there's the starting slash
+      if (root.charAt(0) !== '/') {
+        root = '/' + root;
+      }
+      // remove trailing slash
+      this.root = root.replace(/\/$/, '');
+      this.rootRE = new RegExp('^\\' + this.root);
+    } else {
+      this.root = null;
+    }
+    this.onChange = onChange;
+    // check base tag
+    var baseEl = document.querySelector('base');
+    this.base = baseEl && baseEl.getAttribute('href');
+  }
+
+  HTML5History.prototype.start = function start() {
+    var _this = this;
+
+    this.listener = function (e) {
+      var url = decodeURI(location.pathname + location.search);
+      if (_this.root) {
+        url = url.replace(_this.rootRE, '');
+      }
+      _this.onChange(url, e && e.state, location.hash);
+    };
+    window.addEventListener('popstate', this.listener);
+    this.listener();
+  };
+
+  HTML5History.prototype.stop = function stop() {
+    window.removeEventListener('popstate', this.listener);
+  };
+
+  HTML5History.prototype.go = function go(path, replace, append) {
+    var url = this.formatPath(path, append);
+    if (replace) {
+      history.replaceState({}, '', url);
+    } else {
+      // record scroll position by replacing current state
+      history.replaceState({
+        pos: {
+          x: window.pageXOffset,
+          y: window.pageYOffset
+        }
+      }, '');
+      // then push new state
+      history.pushState({}, '', url);
+    }
+    var hashMatch = path.match(hashRE);
+    var hash = hashMatch && hashMatch[0];
+    path = url
+    // strip hash so it doesn't mess up params
+    .replace(hashRE, '')
+    // remove root before matching
+    .replace(this.rootRE, '');
+    this.onChange(path, null, hash);
+  };
+
+  HTML5History.prototype.formatPath = function formatPath(path, append) {
+    return path.charAt(0) === '/'
+    // absolute path
+    ? this.root ? this.root + '/' + path.replace(/^\//, '') : path : resolvePath(this.base || location.pathname, path, append);
+  };
+
+  return HTML5History;
+})();
+
+var HashHistory = (function () {
+  function HashHistory(_ref) {
+    var hashbang = _ref.hashbang;
+    var onChange = _ref.onChange;
+    babelHelpers.classCallCheck(this, HashHistory);
+
+    this.hashbang = hashbang;
+    this.onChange = onChange;
+  }
+
+  HashHistory.prototype.start = function start() {
+    var self = this;
+    this.listener = function () {
+      var path = location.hash;
+      var raw = path.replace(/^#!?/, '');
+      // always
+      if (raw.charAt(0) !== '/') {
+        raw = '/' + raw;
+      }
+      var formattedPath = self.formatPath(raw);
+      if (formattedPath !== path) {
+        location.replace(formattedPath);
+        return;
+      }
+      // determine query
+      // note it's possible to have queries in both the actual URL
+      // and the hash fragment itself.
+      var query = location.search && path.indexOf('?') > -1 ? '&' + location.search.slice(1) : location.search;
+      self.onChange(decodeURI(path.replace(/^#!?/, '') + query));
+    };
+    window.addEventListener('hashchange', this.listener);
+    this.listener();
+  };
+
+  HashHistory.prototype.stop = function stop() {
+    window.removeEventListener('hashchange', this.listener);
+  };
+
+  HashHistory.prototype.go = function go(path, replace, append) {
+    path = this.formatPath(path, append);
+    if (replace) {
+      location.replace(path);
+    } else {
+      location.hash = path;
+    }
+  };
+
+  HashHistory.prototype.formatPath = function formatPath(path, append) {
+    var isAbsoloute = path.charAt(0) === '/';
+    var prefix = '#' + (this.hashbang ? '!' : '');
+    return isAbsoloute ? prefix + path : prefix + resolvePath(location.hash.replace(/^#!?/, ''), path, append);
+  };
+
+  return HashHistory;
+})();
+
+var AbstractHistory = (function () {
+  function AbstractHistory(_ref) {
+    var onChange = _ref.onChange;
+    babelHelpers.classCallCheck(this, AbstractHistory);
+
+    this.onChange = onChange;
+    this.currentPath = '/';
+  }
+
+  AbstractHistory.prototype.start = function start() {
+    this.onChange('/');
+  };
+
+  AbstractHistory.prototype.stop = function stop() {
+    // noop
+  };
+
+  AbstractHistory.prototype.go = function go(path, replace, append) {
+    path = this.currentPath = this.formatPath(path, append);
+    this.onChange(path);
+  };
+
+  AbstractHistory.prototype.formatPath = function formatPath(path, append) {
+    return path.charAt(0) === '/' ? path : resolvePath(this.currentPath, path, append);
+  };
+
+  return AbstractHistory;
+})();
+
+/**
+ * Determine the reusability of an existing router view.
+ *
+ * @param {Directive} view
+ * @param {Object} handler
+ * @param {Transition} transition
+ */
+
+function canReuse(view, handler, transition) {
+  var component = view.childVM;
+  if (!component || !handler) {
+    return false;
+  }
+  // important: check view.Component here because it may
+  // have been changed in activate hook
+  if (view.Component !== handler.component) {
+    return false;
+  }
+  var canReuseFn = getRouteConfig(component, 'canReuse');
+  return typeof canReuseFn === 'boolean' ? canReuseFn : canReuseFn ? canReuseFn.call(component, {
+    to: transition.to,
+    from: transition.from
+  }) : true; // defaults to true
+}
+
+/**
+ * Check if a component can deactivate.
+ *
+ * @param {Directive} view
+ * @param {Transition} transition
+ * @param {Function} next
+ */
+
+function canDeactivate(view, transition, next) {
+  var fromComponent = view.childVM;
+  var hook = getRouteConfig(fromComponent, 'canDeactivate');
+  if (!hook) {
+    next();
+  } else {
+    transition.callHook(hook, fromComponent, next, {
+      expectBoolean: true
+    });
+  }
+}
+
+/**
+ * Check if a component can activate.
+ *
+ * @param {Object} handler
+ * @param {Transition} transition
+ * @param {Function} next
+ */
+
+function canActivate(handler, transition, next) {
+  resolveAsyncComponent(handler, function (Component) {
+    // have to check due to async-ness
+    if (transition.aborted) {
+      return;
+    }
+    // determine if this component can be activated
+    var hook = getRouteConfig(Component, 'canActivate');
+    if (!hook) {
+      next();
+    } else {
+      transition.callHook(hook, null, next, {
+        expectBoolean: true
+      });
+    }
+  });
+}
+
+/**
+ * Call deactivate hooks for existing router-views.
+ *
+ * @param {Directive} view
+ * @param {Transition} transition
+ * @param {Function} next
+ */
+
+function deactivate(view, transition, next) {
+  var component = view.childVM;
+  var hook = getRouteConfig(component, 'deactivate');
+  if (!hook) {
+    next();
+  } else {
+    transition.callHooks(hook, component, next);
+  }
+}
+
+/**
+ * Activate / switch component for a router-view.
+ *
+ * @param {Directive} view
+ * @param {Transition} transition
+ * @param {Number} depth
+ * @param {Function} [cb]
+ */
+
+function activate(view, transition, depth, cb, reuse) {
+  var handler = transition.activateQueue[depth];
+  if (!handler) {
+    // fix 1.0.0-alpha.3 compat
+    if (view._bound) {
+      view.setComponent(null);
+    }
+    cb && cb();
+    return;
+  }
+
+  var Component = view.Component = handler.component;
+  var activateHook = getRouteConfig(Component, 'activate');
+  var dataHook = getRouteConfig(Component, 'data');
+  var waitForData = getRouteConfig(Component, 'waitForData');
+
+  view.depth = depth;
+  view.activated = false;
+
+  var component = undefined;
+  var loading = !!(dataHook && !waitForData);
+
+  // "reuse" is a flag passed down when the parent view is
+  // either reused via keep-alive or as a child of a kept-alive view.
+  // of course we can only reuse if the current kept-alive instance
+  // is of the correct type.
+  reuse = reuse && view.childVM && view.childVM.constructor === Component;
+
+  if (reuse) {
+    // just reuse
+    component = view.childVM;
+    component.$loadingRouteData = loading;
+  } else {
+    // unbuild current component. this step also destroys
+    // and removes all nested child views.
+    view.unbuild(true);
+    // handle keep-alive.
+    // if the view has keep-alive, the child vm is not actually
+    // destroyed - its nested views will still be in router's
+    // view list. We need to removed these child views and
+    // cache them on the child vm.
+    if (view.keepAlive) {
+      var views = transition.router._views;
+      var i = views.indexOf(view);
+      if (i > 0) {
+        transition.router._views = views.slice(i);
+        if (view.childVM) {
+          view.childVM._routerViews = views.slice(0, i);
+        }
+      }
+    }
+
+    // build the new component. this will also create the
+    // direct child view of the current one. it will register
+    // itself as view.childView.
+    component = view.build({
+      _meta: {
+        $loadingRouteData: loading
+      }
+    });
+    // handle keep-alive.
+    // when a kept-alive child vm is restored, we need to
+    // add its cached child views into the router's view list,
+    // and also properly update current view's child view.
+    if (view.keepAlive) {
+      component.$loadingRouteData = loading;
+      var cachedViews = component._routerViews;
+      if (cachedViews) {
+        transition.router._views = cachedViews.concat(transition.router._views);
+        view.childView = cachedViews[cachedViews.length - 1];
+        component._routerViews = null;
+      }
+    }
+  }
+
+  // cleanup the component in case the transition is aborted
+  // before the component is ever inserted.
+  var cleanup = function cleanup() {
+    component.$destroy();
+  };
+
+  // actually insert the component and trigger transition
+  var insert = function insert() {
+    if (reuse) {
+      cb && cb();
+      return;
+    }
+    var router = transition.router;
+    if (router._rendered || router._transitionOnLoad) {
+      view.transition(component);
+    } else {
+      // no transition on first render, manual transition
+      /* istanbul ignore if */
+      if (view.setCurrent) {
+        // 0.12 compat
+        view.setCurrent(component);
+      } else {
+        // 1.0
+        view.childVM = component;
+      }
+      component.$before(view.anchor, null, false);
+    }
+    cb && cb();
+  };
+
+  // called after activation hook is resolved
+  var afterActivate = function afterActivate() {
+    view.activated = true;
+    // activate the child view
+    if (view.childView) {
+      activate(view.childView, transition, depth + 1, null, reuse || view.keepAlive);
+    }
+    if (dataHook && waitForData) {
+      // wait until data loaded to insert
+      loadData(component, transition, dataHook, insert, cleanup);
+    } else {
+      // load data and insert at the same time
+      if (dataHook) {
+        loadData(component, transition, dataHook);
+      }
+      insert();
+    }
+  };
+
+  if (activateHook) {
+    transition.callHooks(activateHook, component, afterActivate, {
+      cleanup: cleanup
+    });
+  } else {
+    afterActivate();
+  }
+}
+
+/**
+ * Reuse a view, just reload data if necessary.
+ *
+ * @param {Directive} view
+ * @param {Transition} transition
+ */
+
+function reuse(view, transition) {
+  var component = view.childVM;
+  var dataHook = getRouteConfig(component, 'data');
+  if (dataHook) {
+    loadData(component, transition, dataHook);
+  }
+}
+
+/**
+ * Asynchronously load and apply data to component.
+ *
+ * @param {Vue} component
+ * @param {Transition} transition
+ * @param {Function} hook
+ * @param {Function} cb
+ * @param {Function} cleanup
+ */
+
+function loadData(component, transition, hook, cb, cleanup) {
+  component.$loadingRouteData = true;
+  transition.callHooks(hook, component, function (data, onError) {
+    // merge data from multiple data hooks
+    if (Array.isArray(data) && data._needMerge) {
+      data = data.reduce(function (res, obj) {
+        if (isPlainObject(obj)) {
+          Object.keys(obj).forEach(function (key) {
+            res[key] = obj[key];
+          });
+        }
+        return res;
+      }, Object.create(null));
+    }
+    // handle promise sugar syntax
+    var promises = [];
+    if (isPlainObject(data)) {
+      Object.keys(data).forEach(function (key) {
+        var val = data[key];
+        if (isPromise(val)) {
+          promises.push(val.then(function (resolvedVal) {
+            component.$set(key, resolvedVal);
+          }));
+        } else {
+          component.$set(key, val);
+        }
+      });
+    }
+    if (!promises.length) {
+      component.$loadingRouteData = false;
+      cb && cb();
+    } else {
+      promises[0].constructor.all(promises).then(function (_) {
+        component.$loadingRouteData = false;
+        cb && cb();
+      }, onError);
+    }
+  }, {
+    cleanup: cleanup,
+    expectData: true
+  });
+}
+
+function isPlainObject(obj) {
+  return Object.prototype.toString.call(obj) === '[object Object]';
+}
+
+/**
+ * A RouteTransition object manages the pipeline of a
+ * router-view switching process. This is also the object
+ * passed into user route hooks.
+ *
+ * @param {Router} router
+ * @param {Route} to
+ * @param {Route} from
+ */
+
+var RouteTransition = (function () {
+  function RouteTransition(router, to, from) {
+    babelHelpers.classCallCheck(this, RouteTransition);
+
+    this.router = router;
+    this.to = to;
+    this.from = from;
+    this.next = null;
+    this.aborted = false;
+    this.done = false;
+
+    // start by determine the queues
+
+    // the deactivate queue is an array of router-view
+    // directive instances that need to be deactivated,
+    // deepest first.
+    this.deactivateQueue = router._views;
+
+    // check the default handler of the deepest match
+    var matched = to.matched ? Array.prototype.slice.call(to.matched) : [];
+
+    // the activate queue is an array of route handlers
+    // that need to be activated
+    this.activateQueue = matched.map(function (match) {
+      return match.handler;
+    });
+  }
+
+  /**
+   * Abort current transition and return to previous location.
+   */
+
+  RouteTransition.prototype.abort = function abort() {
+    if (!this.aborted) {
+      this.aborted = true;
+      // if the root path throws an error during validation
+      // on initial load, it gets caught in an infinite loop.
+      var abortingOnLoad = !this.from.path && this.to.path === '/';
+      if (!abortingOnLoad) {
+        this.router.replace(this.from.path || '/');
+      }
+    }
+  };
+
+  /**
+   * Abort current transition and redirect to a new location.
+   *
+   * @param {String} path
+   */
+
+  RouteTransition.prototype.redirect = function redirect(path) {
+    if (!this.aborted) {
+      this.aborted = true;
+      if (typeof path === 'string') {
+        path = mapParams(path, this.to.params, this.to.query);
+      } else {
+        path.params = path.params || this.to.params;
+        path.query = path.query || this.to.query;
+      }
+      this.router.replace(path);
+    }
+  };
+
+  /**
+   * A router view transition's pipeline can be described as
+   * follows, assuming we are transitioning from an existing
+   * <router-view> chain [Component A, Component B] to a new
+   * chain [Component A, Component C]:
+   *
+   *  A    A
+   *  | => |
+   *  B    C
+   *
+   * 1. Reusablity phase:
+   *   -> canReuse(A, A)
+   *   -> canReuse(B, C)
+   *   -> determine new queues:
+   *      - deactivation: [B]
+   *      - activation: [C]
+   *
+   * 2. Validation phase:
+   *   -> canDeactivate(B)
+   *   -> canActivate(C)
+   *
+   * 3. Activation phase:
+   *   -> deactivate(B)
+   *   -> activate(C)
+   *
+   * Each of these steps can be asynchronous, and any
+   * step can potentially abort the transition.
+   *
+   * @param {Function} cb
+   */
+
+  RouteTransition.prototype.start = function start(cb) {
+    var transition = this;
+    var daq = this.deactivateQueue;
+    var aq = this.activateQueue;
+    var rdaq = daq.slice().reverse();
+    var reuseQueue = undefined;
+
+    // 1. Reusability phase
+    var i = undefined;
+    for (i = 0; i < rdaq.length; i++) {
+      if (!canReuse(rdaq[i], aq[i], transition)) {
+        break;
+      }
+    }
+    if (i > 0) {
+      reuseQueue = rdaq.slice(0, i);
+      daq = rdaq.slice(i).reverse();
+      aq = aq.slice(i);
+    }
+
+    // 2. Validation phase
+    transition.runQueue(daq, canDeactivate, function () {
+      transition.runQueue(aq, canActivate, function () {
+        transition.runQueue(daq, deactivate, function () {
+          // 3. Activation phase
+
+          // Update router current route
+          transition.router._onTransitionValidated(transition);
+
+          // trigger reuse for all reused views
+          reuseQueue && reuseQueue.forEach(function (view) {
+            reuse(view, transition);
+          });
+
+          // the root of the chain that needs to be replaced
+          // is the top-most non-reusable view.
+          if (daq.length) {
+            var view = daq[daq.length - 1];
+            var depth = reuseQueue ? reuseQueue.length : 0;
+            activate(view, transition, depth, cb);
+          } else {
+            cb();
+          }
+        });
+      });
+    });
+  };
+
+  /**
+   * Asynchronously and sequentially apply a function to a
+   * queue.
+   *
+   * @param {Array} queue
+   * @param {Function} fn
+   * @param {Function} cb
+   */
+
+  RouteTransition.prototype.runQueue = function runQueue(queue, fn, cb) {
+    var transition = this;
+    step(0);
+    function step(index) {
+      if (index >= queue.length) {
+        cb();
+      } else {
+        fn(queue[index], transition, function () {
+          step(index + 1);
+        });
+      }
+    }
+  };
+
+  /**
+   * Call a user provided route transition hook and handle
+   * the response (e.g. if the user returns a promise).
+   *
+   * If the user neither expects an argument nor returns a
+   * promise, the hook is assumed to be synchronous.
+   *
+   * @param {Function} hook
+   * @param {*} [context]
+   * @param {Function} [cb]
+   * @param {Object} [options]
+   *                 - {Boolean} expectBoolean
+   *                 - {Boolean} expectData
+   *                 - {Function} cleanup
+   */
+
+  RouteTransition.prototype.callHook = function callHook(hook, context, cb) {
+    var _ref = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
+
+    var _ref$expectBoolean = _ref.expectBoolean;
+    var expectBoolean = _ref$expectBoolean === undefined ? false : _ref$expectBoolean;
+    var _ref$expectData = _ref.expectData;
+    var expectData = _ref$expectData === undefined ? false : _ref$expectData;
+    var cleanup = _ref.cleanup;
+
+    var transition = this;
+    var nextCalled = false;
+
+    // abort the transition
+    var abort = function abort() {
+      cleanup && cleanup();
+      transition.abort();
+    };
+
+    // handle errors
+    var onError = function onError(err) {
+      // cleanup indicates an after-activation hook,
+      // so instead of aborting we just let the transition
+      // finish.
+      cleanup ? next() : abort();
+      if (err && !transition.router._suppress) {
+        warn('Uncaught error during transition: ');
+        throw err instanceof Error ? err : new Error(err);
+      }
+    };
+
+    // advance the transition to the next step
+    var next = function next(data) {
+      if (nextCalled) {
+        warn('transition.next() should be called only once.');
+        return;
+      }
+      nextCalled = true;
+      if (transition.aborted) {
+        cleanup && cleanup();
+        return;
+      }
+      cb && cb(data, onError);
+    };
+
+    // expose a clone of the transition object, so that each
+    // hook gets a clean copy and prevent the user from
+    // messing with the internals.
+    var exposed = {
+      to: transition.to,
+      from: transition.from,
+      abort: abort,
+      next: next,
+      redirect: function redirect() {
+        transition.redirect.apply(transition, arguments);
+      }
+    };
+
+    // actually call the hook
+    var res = undefined;
+    try {
+      res = hook.call(context, exposed);
+    } catch (err) {
+      return onError(err);
+    }
+
+    // handle boolean/promise return values
+    var resIsPromise = isPromise(res);
+    if (expectBoolean) {
+      if (typeof res === 'boolean') {
+        res ? next() : abort();
+      } else if (resIsPromise) {
+        res.then(function (ok) {
+          ok ? next() : abort();
+        }, onError);
+      } else if (!hook.length) {
+        next(res);
+      }
+    } else if (resIsPromise) {
+      res.then(next, onError);
+    } else if (expectData && isPlainOjbect(res) || !hook.length) {
+      next(res);
+    }
+  };
+
+  /**
+   * Call a single hook or an array of async hooks in series.
+   *
+   * @param {Array} hooks
+   * @param {*} context
+   * @param {Function} cb
+   * @param {Object} [options]
+   */
+
+  RouteTransition.prototype.callHooks = function callHooks(hooks, context, cb, options) {
+    var _this = this;
+
+    if (Array.isArray(hooks)) {
+      (function () {
+        var res = [];
+        res._needMerge = true;
+        var onError = undefined;
+        _this.runQueue(hooks, function (hook, _, next) {
+          if (!_this.aborted) {
+            _this.callHook(hook, context, function (r, onError) {
+              if (r) res.push(r);
+              onError = onError;
+              next();
+            }, options);
+          }
+        }, function () {
+          cb(res, onError);
+        });
+      })();
+    } else {
+      this.callHook(hooks, context, cb, options);
+    }
+  };
+
+  return RouteTransition;
+})();
+
+function isPlainOjbect(val) {
+  return Object.prototype.toString.call(val) === '[object Object]';
+}
+
+var internalKeysRE = /^(component|subRoutes)$/;
+
+/**
+ * Route Context Object
+ *
+ * @param {String} path
+ * @param {Router} router
+ */
+
+var Route = function Route(path, router) {
+  var _this = this;
+
+  babelHelpers.classCallCheck(this, Route);
+
+  var matched = router._recognizer.recognize(path);
+  if (matched) {
+    // copy all custom fields from route configs
+    [].forEach.call(matched, function (match) {
+      for (var key in match.handler) {
+        if (!internalKeysRE.test(key)) {
+          _this[key] = match.handler[key];
+        }
+      }
+    });
+    // set query and params
+    this.query = matched.queryParams;
+    this.params = [].reduce.call(matched, function (prev, cur) {
+      if (cur.params) {
+        for (var key in cur.params) {
+          prev[key] = cur.params[key];
+        }
+      }
+      return prev;
+    }, {});
+  }
+  // expose path and router
+  this.path = path;
+  this.router = router;
+  // for internal use
+  this.matched = matched || router._notFoundHandler;
+  // Important: freeze self to prevent observation
+  Object.freeze(this);
+};
+
+function applyOverride (Vue) {
+
+  var _ = Vue.util;
+
+  // override Vue's init and destroy process to keep track of router instances
+  var init = Vue.prototype._init;
+  Vue.prototype._init = function (options) {
+    var root = options._parent || options.parent || this;
+    var route = root.$route;
+    if (route) {
+      route.router._children.push(this);
+      if (!this.$route) {
+        /* istanbul ignore if */
+        if (this._defineMeta) {
+          // 0.12
+          this._defineMeta('$route', route);
+        } else {
+          // 1.0
+          _.defineReactive(this, '$route', route);
+        }
+      }
+    }
+    init.call(this, options);
+  };
+
+  var destroy = Vue.prototype._destroy;
+  Vue.prototype._destroy = function () {
+    if (!this._isBeingDestroyed) {
+      var route = this.$root.$route;
+      if (route) {
+        route.router._children.$remove(this);
+      }
+      destroy.apply(this, arguments);
+    }
+  };
+
+  // 1.0 only: enable route mixins
+  var strats = Vue.config.optionMergeStrategies;
+  var hooksToMergeRE = /^(data|activate|deactivate)$/;
+
+  if (strats) {
+    strats.route = function (parentVal, childVal) {
+      if (!childVal) return parentVal;
+      if (!parentVal) return childVal;
+      var ret = {};
+      _.extend(ret, parentVal);
+      for (var key in childVal) {
+        var a = ret[key];
+        var b = childVal[key];
+        // for data, activate and deactivate, we need to merge them into
+        // arrays similar to lifecycle hooks.
+        if (a && hooksToMergeRE.test(key)) {
+          ret[key] = (_.isArray(a) ? a : [a]).concat(b);
+        } else {
+          ret[key] = b;
+        }
+      }
+      return ret;
+    };
+  }
+}
+
+function View (Vue) {
+
+  var _ = Vue.util;
+  var componentDef =
+  // 0.12
+  Vue.directive('_component') ||
+  // 1.0
+  Vue.internalDirectives.component;
+  // <router-view> extends the internal component directive
+  var viewDef = _.extend({}, componentDef);
+
+  // with some overrides
+  _.extend(viewDef, {
+
+    _isRouterView: true,
+
+    bind: function bind() {
+      var route = this.vm.$route;
+      /* istanbul ignore if */
+      if (!route) {
+        warn('<router-view> can only be used inside a ' + 'router-enabled app.');
+        return;
+      }
+      // force dynamic directive so v-component doesn't
+      // attempt to build right now
+      this._isDynamicLiteral = true;
+      // finally, init by delegating to v-component
+      componentDef.bind.call(this);
+
+      // all we need to do here is registering this view
+      // in the router. actual component switching will be
+      // managed by the pipeline.
+      var router = this.router = route.router;
+      router._views.unshift(this);
+
+      // note the views are in reverse order.
+      var parentView = router._views[1];
+      if (parentView) {
+        // register self as a child of the parent view,
+        // instead of activating now. This is so that the
+        // child's activate hook is called after the
+        // parent's has resolved.
+        parentView.childView = this;
+      }
+
+      // handle late-rendered view
+      // two possibilities:
+      // 1. root view rendered after transition has been
+      //    validated;
+      // 2. child view rendered after parent view has been
+      //    activated.
+      var transition = route.router._currentTransition;
+      if (!parentView && transition.done || parentView && parentView.activated) {
+        var depth = parentView ? parentView.depth + 1 : 0;
+        activate(this, transition, depth);
+      }
+    },
+
+    unbind: function unbind() {
+      this.router._views.$remove(this);
+      componentDef.unbind.call(this);
+    }
+  });
+
+  Vue.elementDirective('router-view', viewDef);
+}
+
+var trailingSlashRE = /\/$/;
+var regexEscapeRE = /[-.*+?^${}()|[\]\/\\]/g;
+var queryStringRE = /\?.*$/;
+
+// install v-link, which provides navigation support for
+// HTML5 history mode
+function Link (Vue) {
+
+  var _ = Vue.util;
+
+  Vue.directive('link', {
+
+    bind: function bind() {
+      var _this = this;
+
+      var vm = this.vm;
+      /* istanbul ignore if */
+      if (!vm.$route) {
+        warn('v-link can only be used inside a ' + 'router-enabled app.');
+        return;
+      }
+      // no need to handle click if link expects to be opened
+      // in a new window/tab.
+      /* istanbul ignore if */
+      if (this.el.tagName === 'A' && this.el.getAttribute('target') === '_blank') {
+        return;
+      }
+      // handle click
+      var router = vm.$route.router;
+      this.handler = function (e) {
+        // don't redirect with control keys
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+        // don't redirect when preventDefault called
+        if (e.defaultPrevented) return;
+        // don't redirect on right click
+        if (e.button !== 0) return;
+
+        var target = _this.target;
+        var go = function go(target) {
+          e.preventDefault();
+          if (target != null) {
+            router.go(target);
+          }
+        };
+
+        if (_this.el.tagName === 'A' || e.target === _this.el) {
+          // v-link on <a v-link="'path'">
+          go(target);
+        } else {
+          // v-link delegate on <div v-link>
+          var el = e.target;
+          while (el && el.tagName !== 'A' && el !== _this.el) {
+            el = el.parentNode;
+          }
+          if (!el) return;
+          if (el.tagName !== 'A' || !el.href) {
+            // allow not anchor
+            go(target);
+          } else if (sameOrigin(el)) {
+            go({
+              path: el.pathname,
+              replace: target && target.replace,
+              append: target && target.append
+            });
+          }
+        }
+      };
+      this.el.addEventListener('click', this.handler);
+      // manage active link class
+      this.unwatch = vm.$watch('$route.path', _.bind(this.updateClasses, this));
+    },
+
+    update: function update(path) {
+      var router = this.vm.$route.router;
+      var append = undefined;
+      this.target = path;
+      if (_.isObject(path)) {
+        append = path.append;
+        this.exact = path.exact;
+        this.prevActiveClass = this.activeClass;
+        this.activeClass = path.activeClass;
+      }
+      path = this.path = router._stringifyPath(path);
+      this.activeRE = path && !this.exact ? new RegExp('^' + path.replace(/\/$/, '').replace(regexEscapeRE, '\\$&') + '(\\/|$)') : null;
+      this.updateClasses(this.vm.$route.path);
+      var isAbsolute = path.charAt(0) === '/';
+      // do not format non-hash relative paths
+      var href = path && (router.mode === 'hash' || isAbsolute) ? router.history.formatPath(path, append) : path;
+      if (this.el.tagName === 'A') {
+        if (href) {
+          this.el.href = href;
+        } else {
+          this.el.removeAttribute('href');
+        }
+      }
+    },
+
+    updateClasses: function updateClasses(path) {
+      var el = this.el;
+      var router = this.vm.$route.router;
+      var activeClass = this.activeClass || router._linkActiveClass;
+      // clear old class
+      if (this.prevActiveClass !== activeClass) {
+        _.removeClass(el, this.prevActiveClass);
+      }
+      // remove query string before matching
+      var dest = this.path.replace(queryStringRE, '');
+      path = path.replace(queryStringRE, '');
+      // add new class
+      if (this.exact) {
+        if (dest === path ||
+        // also allow additional trailing slash
+        dest.charAt(dest.length - 1) !== '/' && dest === path.replace(trailingSlashRE, '')) {
+          _.addClass(el, activeClass);
+        } else {
+          _.removeClass(el, activeClass);
+        }
+      } else {
+        if (this.activeRE && this.activeRE.test(path)) {
+          _.addClass(el, activeClass);
+        } else {
+          _.removeClass(el, activeClass);
+        }
+      }
+    },
+
+    unbind: function unbind() {
+      this.el.removeEventListener('click', this.handler);
+      this.unwatch && this.unwatch();
+    }
+  });
+
+  function sameOrigin(link) {
+    return link.protocol === location.protocol && link.hostname === location.hostname && link.port === location.port;
+  }
+}
+
+var historyBackends = {
+  abstract: AbstractHistory,
+  hash: HashHistory,
+  html5: HTML5History
+};
+
+// late bind during install
+var Vue = undefined;
+
+/**
+ * Router constructor
+ *
+ * @param {Object} [options]
+ */
+
+var Router = (function () {
+  function Router() {
+    var _ref = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
+
+    var _ref$hashbang = _ref.hashbang;
+    var hashbang = _ref$hashbang === undefined ? true : _ref$hashbang;
+    var _ref$abstract = _ref.abstract;
+    var abstract = _ref$abstract === undefined ? false : _ref$abstract;
+    var _ref$history = _ref.history;
+    var history = _ref$history === undefined ? false : _ref$history;
+    var _ref$saveScrollPosition = _ref.saveScrollPosition;
+    var saveScrollPosition = _ref$saveScrollPosition === undefined ? false : _ref$saveScrollPosition;
+    var _ref$transitionOnLoad = _ref.transitionOnLoad;
+    var transitionOnLoad = _ref$transitionOnLoad === undefined ? false : _ref$transitionOnLoad;
+    var _ref$suppressTransitionError = _ref.suppressTransitionError;
+    var suppressTransitionError = _ref$suppressTransitionError === undefined ? false : _ref$suppressTransitionError;
+    var _ref$root = _ref.root;
+    var root = _ref$root === undefined ? null : _ref$root;
+    var _ref$linkActiveClass = _ref.linkActiveClass;
+    var linkActiveClass = _ref$linkActiveClass === undefined ? 'v-link-active' : _ref$linkActiveClass;
+    babelHelpers.classCallCheck(this, Router);
+
+    /* istanbul ignore if */
+    if (!Router.installed) {
+      throw new Error('Please install the Router with Vue.use() before ' + 'creating an instance.');
+    }
+
+    // Vue instances
+    this.app = null;
+    this._views = [];
+    this._children = [];
+
+    // route recognizer
+    this._recognizer = new RouteRecognizer();
+    this._guardRecognizer = new RouteRecognizer();
+
+    // state
+    this._started = false;
+    this._startCb = null;
+    this._currentRoute = {};
+    this._currentTransition = null;
+    this._previousTransition = null;
+    this._notFoundHandler = null;
+    this._notFoundRedirect = null;
+    this._beforeEachHooks = [];
+    this._afterEachHooks = [];
+
+    // feature detection
+    this._hasPushState = typeof window !== 'undefined' && window.history && window.history.pushState;
+
+    // trigger transition on initial render?
+    this._rendered = false;
+    this._transitionOnLoad = transitionOnLoad;
+
+    // history mode
+    this._abstract = abstract;
+    this._hashbang = hashbang;
+    this._history = this._hasPushState && history;
+
+    // other options
+    this._saveScrollPosition = saveScrollPosition;
+    this._linkActiveClass = linkActiveClass;
+    this._suppress = suppressTransitionError;
+
+    // create history object
+    var inBrowser = Vue.util.inBrowser;
+    this.mode = !inBrowser || this._abstract ? 'abstract' : this._history ? 'html5' : 'hash';
+
+    var History = historyBackends[this.mode];
+    var self = this;
+    this.history = new History({
+      root: root,
+      hashbang: this._hashbang,
+      onChange: function onChange(path, state, anchor) {
+        self._match(path, state, anchor);
+      }
+    });
+  }
+
+  /**
+   * Allow directly passing components to a route
+   * definition.
+   *
+   * @param {String} path
+   * @param {Object} handler
+   */
+
+  // API ===================================================
+
+  /**
+  * Register a map of top-level paths.
+  *
+  * @param {Object} map
+  */
+
+  Router.prototype.map = function map(_map) {
+    for (var route in _map) {
+      this.on(route, _map[route]);
+    }
+  };
+
+  /**
+   * Register a single root-level path
+   *
+   * @param {String} rootPath
+   * @param {Object} handler
+   *                 - {String} component
+   *                 - {Object} [subRoutes]
+   *                 - {Boolean} [forceRefresh]
+   *                 - {Function} [before]
+   *                 - {Function} [after]
+   */
+
+  Router.prototype.on = function on(rootPath, handler) {
+    if (rootPath === '*') {
+      this._notFound(handler);
+    } else {
+      this._addRoute(rootPath, handler, []);
+    }
+  };
+
+  /**
+   * Set redirects.
+   *
+   * @param {Object} map
+   */
+
+  Router.prototype.redirect = function redirect(map) {
+    for (var path in map) {
+      this._addRedirect(path, map[path]);
+    }
+  };
+
+  /**
+   * Set aliases.
+   *
+   * @param {Object} map
+   */
+
+  Router.prototype.alias = function alias(map) {
+    for (var path in map) {
+      this._addAlias(path, map[path]);
+    }
+  };
+
+  /**
+   * Set global before hook.
+   *
+   * @param {Function} fn
+   */
+
+  Router.prototype.beforeEach = function beforeEach(fn) {
+    this._beforeEachHooks.push(fn);
+  };
+
+  /**
+   * Set global after hook.
+   *
+   * @param {Function} fn
+   */
+
+  Router.prototype.afterEach = function afterEach(fn) {
+    this._afterEachHooks.push(fn);
+  };
+
+  /**
+   * Navigate to a given path.
+   * The path can be an object describing a named path in
+   * the format of { name: '...', params: {}, query: {}}
+   * The path is assumed to be already decoded, and will
+   * be resolved against root (if provided)
+   *
+   * @param {String|Object} path
+   * @param {Boolean} [replace]
+   */
+
+  Router.prototype.go = function go(path) {
+    var replace = false;
+    var append = false;
+    if (Vue.util.isObject(path)) {
+      replace = path.replace;
+      append = path.append;
+    }
+    path = this._stringifyPath(path);
+    if (path) {
+      this.history.go(path, replace, append);
+    }
+  };
+
+  /**
+   * Short hand for replacing current path
+   *
+   * @param {String} path
+   */
+
+  Router.prototype.replace = function replace(path) {
+    if (typeof path === 'string') {
+      path = { path: path };
+    }
+    path.replace = true;
+    this.go(path);
+  };
+
+  /**
+   * Start the router.
+   *
+   * @param {VueConstructor} App
+   * @param {String|Element} container
+   * @param {Function} [cb]
+   */
+
+  Router.prototype.start = function start(App, container, cb) {
+    /* istanbul ignore if */
+    if (this._started) {
+      warn('already started.');
+      return;
+    }
+    this._started = true;
+    this._startCb = cb;
+    if (!this.app) {
+      /* istanbul ignore if */
+      if (!App || !container) {
+        throw new Error('Must start vue-router with a component and a ' + 'root container.');
+      }
+      this._appContainer = container;
+      var Ctor = this._appConstructor = typeof App === 'function' ? App : Vue.extend(App);
+      // give it a name for better debugging
+      Ctor.options.name = Ctor.options.name || 'RouterApp';
+    }
+    this.history.start();
+  };
+
+  /**
+   * Stop listening to route changes.
+   */
+
+  Router.prototype.stop = function stop() {
+    this.history.stop();
+    this._started = false;
+  };
+
+  // Internal methods ======================================
+
+  /**
+  * Add a route containing a list of segments to the internal
+  * route recognizer. Will be called recursively to add all
+  * possible sub-routes.
+  *
+  * @param {String} path
+  * @param {Object} handler
+  * @param {Array} segments
+  */
+
+  Router.prototype._addRoute = function _addRoute(path, handler, segments) {
+    guardComponent(path, handler);
+    handler.path = path;
+    handler.fullPath = (segments.reduce(function (path, segment) {
+      return path + segment.path;
+    }, '') + path).replace('//', '/');
+    segments.push({
+      path: path,
+      handler: handler
+    });
+    this._recognizer.add(segments, {
+      as: handler.name
+    });
+    // add sub routes
+    if (handler.subRoutes) {
+      for (var subPath in handler.subRoutes) {
+        // recursively walk all sub routes
+        this._addRoute(subPath, handler.subRoutes[subPath],
+        // pass a copy in recursion to avoid mutating
+        // across branches
+        segments.slice());
+      }
+    }
+  };
+
+  /**
+   * Set the notFound route handler.
+   *
+   * @param {Object} handler
+   */
+
+  Router.prototype._notFound = function _notFound(handler) {
+    guardComponent('*', handler);
+    this._notFoundHandler = [{ handler: handler }];
+  };
+
+  /**
+   * Add a redirect record.
+   *
+   * @param {String} path
+   * @param {String} redirectPath
+   */
+
+  Router.prototype._addRedirect = function _addRedirect(path, redirectPath) {
+    if (path === '*') {
+      this._notFoundRedirect = redirectPath;
+    } else {
+      this._addGuard(path, redirectPath, this.replace);
+    }
+  };
+
+  /**
+   * Add an alias record.
+   *
+   * @param {String} path
+   * @param {String} aliasPath
+   */
+
+  Router.prototype._addAlias = function _addAlias(path, aliasPath) {
+    this._addGuard(path, aliasPath, this._match);
+  };
+
+  /**
+   * Add a path guard.
+   *
+   * @param {String} path
+   * @param {String} mappedPath
+   * @param {Function} handler
+   */
+
+  Router.prototype._addGuard = function _addGuard(path, mappedPath, _handler) {
+    var _this = this;
+
+    this._guardRecognizer.add([{
+      path: path,
+      handler: function handler(match, query) {
+        var realPath = mapParams(mappedPath, match.params, query);
+        _handler.call(_this, realPath);
+      }
+    }]);
+  };
+
+  /**
+   * Check if a path matches any redirect records.
+   *
+   * @param {String} path
+   * @return {Boolean} - if true, will skip normal match.
+   */
+
+  Router.prototype._checkGuard = function _checkGuard(path) {
+    var matched = this._guardRecognizer.recognize(path);
+    if (matched) {
+      matched[0].handler(matched[0], matched.queryParams);
+      return true;
+    } else if (this._notFoundRedirect) {
+      matched = this._recognizer.recognize(path);
+      if (!matched) {
+        this.replace(this._notFoundRedirect);
+        return true;
+      }
+    }
+  };
+
+  /**
+   * Match a URL path and set the route context on vm,
+   * triggering view updates.
+   *
+   * @param {String} path
+   * @param {Object} [state]
+   * @param {String} [anchor]
+   */
+
+  Router.prototype._match = function _match(path, state, anchor) {
+    var _this2 = this;
+
+    if (this._checkGuard(path)) {
+      return;
+    }
+
+    var currentRoute = this._currentRoute;
+    var currentTransition = this._currentTransition;
+
+    if (currentTransition) {
+      if (currentTransition.to.path === path) {
+        // do nothing if we have an active transition going to the same path
+        return;
+      } else if (currentRoute.path === path) {
+        // We are going to the same path, but we also have an ongoing but
+        // not-yet-validated transition. Abort that transition and reset to
+        // prev transition.
+        currentTransition.aborted = true;
+        this._currentTransition = this._prevTransition;
+        return;
+      } else {
+        // going to a totally different path. abort ongoing transition.
+        currentTransition.aborted = true;
+      }
+    }
+
+    // construct new route and transition context
+    var route = new Route(path, this);
+    var transition = new RouteTransition(this, route, currentRoute);
+
+    // current transition is updated right now.
+    // however, current route will only be updated after the transition has
+    // been validated.
+    this._prevTransition = currentTransition;
+    this._currentTransition = transition;
+
+    if (!this.app) {
+      // initial render
+      this.app = new this._appConstructor({
+        el: this._appContainer,
+        _meta: {
+          $route: route
+        }
+      });
+    }
+
+    // check global before hook
+    var beforeHooks = this._beforeEachHooks;
+    var startTransition = function startTransition() {
+      transition.start(function () {
+        _this2._postTransition(route, state, anchor);
+      });
+    };
+
+    if (beforeHooks.length) {
+      transition.runQueue(beforeHooks, function (hook, _, next) {
+        if (transition === _this2._currentTransition) {
+          transition.callHook(hook, null, next, {
+            expectBoolean: true
+          });
+        }
+      }, startTransition);
+    } else {
+      startTransition();
+    }
+
+    if (!this._rendered && this._startCb) {
+      this._startCb.call(null);
+    }
+
+    // HACK:
+    // set rendered to true after the transition start, so
+    // that components that are acitvated synchronously know
+    // whether it is the initial render.
+    this._rendered = true;
+  };
+
+  /**
+   * Set current to the new transition.
+   * This is called by the transition object when the
+   * validation of a route has succeeded.
+   *
+   * @param {Transition} transition
+   */
+
+  Router.prototype._onTransitionValidated = function _onTransitionValidated(transition) {
+    // set current route
+    var route = this._currentRoute = transition.to;
+    // update route context for all children
+    if (this.app.$route !== route) {
+      this.app.$route = route;
+      this._children.forEach(function (child) {
+        child.$route = route;
+      });
+    }
+    // call global after hook
+    if (this._afterEachHooks.length) {
+      this._afterEachHooks.forEach(function (hook) {
+        return hook.call(null, {
+          to: transition.to,
+          from: transition.from
+        });
+      });
+    }
+    this._currentTransition.done = true;
+  };
+
+  /**
+   * Handle stuff after the transition.
+   *
+   * @param {Route} route
+   * @param {Object} [state]
+   * @param {String} [anchor]
+   */
+
+  Router.prototype._postTransition = function _postTransition(route, state, anchor) {
+    // handle scroll positions
+    // saved scroll positions take priority
+    // then we check if the path has an anchor
+    var pos = state && state.pos;
+    if (pos && this._saveScrollPosition) {
+      Vue.nextTick(function () {
+        window.scrollTo(pos.x, pos.y);
+      });
+    } else if (anchor) {
+      Vue.nextTick(function () {
+        var el = document.getElementById(anchor.slice(1));
+        if (el) {
+          window.scrollTo(window.scrollX, el.offsetTop);
+        }
+      });
+    }
+  };
+
+  /**
+   * Normalize named route object / string paths into
+   * a string.
+   *
+   * @param {Object|String|Number} path
+   * @return {String}
+   */
+
+  Router.prototype._stringifyPath = function _stringifyPath(path) {
+    if (path && typeof path === 'object') {
+      if (path.name) {
+        var params = path.params || {};
+        if (path.query) {
+          params.queryParams = path.query;
+        }
+        return this._recognizer.generate(path.name, params);
+      } else if (path.path) {
+        var fullPath = path.path;
+        if (path.query) {
+          var query = this._recognizer.generateQueryString(path.query);
+          if (fullPath.indexOf('?') > -1) {
+            fullPath += '&' + query.slice(1);
+          } else {
+            fullPath += query;
+          }
+        }
+        return fullPath;
+      } else {
+        return '';
+      }
+    } else {
+      return path ? path + '' : '';
+    }
+  };
+
+  return Router;
+})();
+
+function guardComponent(path, handler) {
+  var comp = handler.component;
+  if (Vue.util.isPlainObject(comp)) {
+    comp = handler.component = Vue.extend(comp);
+  }
+  /* istanbul ignore if */
+  if (typeof comp !== 'function') {
+    handler.component = null;
+    warn('invalid component for route "' + path + '".');
+  }
+}
+
+/* Installation */
+
+Router.installed = false;
+
+/**
+ * Installation interface.
+ * Install the necessary directives.
+ */
+
+Router.install = function (externalVue) {
+  /* istanbul ignore if */
+  if (Router.installed) {
+    warn('already installed.');
+    return;
+  }
+  Vue = externalVue;
+  applyOverride(Vue);
+  View(Vue);
+  Link(Vue);
+  exports$1.Vue = Vue;
+  Router.installed = true;
+};
+
+// auto install
+/* istanbul ignore if */
+if (typeof window !== 'undefined' && window.Vue) {
+  window.Vue.use(Router);
+}
+
+module.exports = Router;
+},{}],5:[function(require,module,exports){
 /*!
  * vue-validator v2.0.0-alpha.5
  * (c) 2015 kazuya kawaguchi
@@ -10306,7 +15513,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ ])
 });
 ;
-},{}],4:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 (function (process){
 /*!
  * Vue.js v1.0.10
@@ -19611,20 +24818,18 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = Vue;
 }).call(this,require('_process'))
-},{"_process":2}],5:[function(require,module,exports){
+},{"_process":2}],7:[function(require,module,exports){
 'use strict';
 
 var Vue = require('vue');
 var Manager = require('./managers/init');
+var Nav = require('./components/nav');
 
 Manager.setup();
 
-//Vue.config.debug = true;
-var nav = require('./components/nav');
+var router = require('./router');
 
-var form = require('./components/form');
-
-},{"./components/form":6,"./components/nav":7,"./managers/init":9,"vue":4}],6:[function(require,module,exports){
+},{"./components/nav":10,"./managers/init":14,"./router":18,"vue":6}],8:[function(require,module,exports){
 'use strict';
 
 var Vue = require('vue');
@@ -19633,70 +24838,92 @@ var FormManager = require('../managers/form');
 
 Vue.use(VueValidator);
 
-Vue.validator('email', function (val) {
-   return (/^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(val)
-   );
-});
+var Vue = require('../helpers/validator');
 
-var contactForm = new Vue({
-   el: '#contactForm',
-   data: {
-      firstname: '',
-      lastname: '',
-      email: '',
-      phone: '',
-      message: '',
-      globalError: false,
-      formSent: false
-   },
-   methods: {
-      sendForm: function sendForm() {
-         if (this.$validation.invalid) {
-            this.globalError = true;
-            return false;
-         }
+var contactForm = Vue.component('contactform', {
+    template: '#contactform',
+    data: function data() {
+        return {
+            firstname: '',
+            lastname: '',
+            email: '',
+            phone: '',
+            message: '',
+            globalError: false,
+            formSent: false
+        };
+    },
+    methods: {
+        sendForm: function sendForm() {
+            if (this.$validation.invalid) {
+                this.globalError = true;
+                return false;
+            }
 
-         this.globalError = false;
+            this.globalError = false;
 
-         var data = {
-            firstname: this.firstname,
-            lastname: this.lastname,
-            email: this.email,
-            phone: this.phone,
-            message: this.message
-         };
-         var self = this;
-         FormManager.send(data, function (result) {
-            self.formSent = true;
-            console.log(result);
-         });
-      },
-      validate: function validate(validation, element) {
+            var data = {
+                firstname: this.firstname,
+                lastname: this.lastname,
+                email: this.email,
+                phone: this.phone,
+                message: this.message
+            };
+            var self = this;
+            FormManager.send(data, function (result) {
+                self.formSent = true;
+            });
+        },
+        validate: function validate(validation, element) {
 
-         if (this.globalError === true && validation[element].dirty === false) {
-            return true;
-         }
+            if (this.globalError === true && validation[element].dirty === false) {
+                return true;
+            }
 
-         if (!validation[element] || validation[element].dirty === false) {
-            return false;
-         }
+            if (!validation[element] || validation[element].dirty === false) {
+                return false;
+            }
 
-         return validation[element].required;
-      },
-      success: function success(validation, element) {
+            return validation[element].required;
+        },
+        success: function success(validation, element) {
 
-         if (!validation[element] || validation[element].dirty === false) {
-            return false;
-         }
+            if (!validation[element] || validation[element].dirty === false) {
+                return false;
+            }
 
-         return validation[element].valid;
-      }
-   }
+            return validation[element].valid;
+        }
+    }
+
 });
 
 module.exports = contactForm;
 
-},{"../managers/form":8,"vue":4,"vue-validator":3}],7:[function(require,module,exports){
+},{"../helpers/validator":12,"../managers/form":13,"vue":6,"vue-validator":5}],9:[function(require,module,exports){
+'use strict';
+
+var Vue = require('vue');
+var InstagramManager = require('../managers/instagram');
+
+var InstagramComponent = Vue.component('instagram', {
+    template: '#instagram',
+    data: function data() {
+        return {
+            items: []
+        };
+    },
+    created: function created() {
+        var self = this;
+        InstagramManager.getFeed(function (result) {
+            self.items = result.data;
+        });
+    }
+});
+
+module.exports = InstagramComponent;
+
+},{"../managers/instagram":15,"vue":6}],10:[function(require,module,exports){
 'use strict';
 
 var Vue = require('vue');
@@ -19716,7 +24943,45 @@ var nav = new Vue({
 
 module.exports = nav;
 
-},{"vue":4}],8:[function(require,module,exports){
+},{"vue":6}],11:[function(require,module,exports){
+'use strict';
+
+var Vue = require('vue');
+var jQuery = require('jquery');
+var slick = require('slick-carousel');
+
+var slider = Vue.component('slider', {
+    template: '#slider',
+    ready: function ready() {
+        jQuery('.homeSlider').slick({
+            prevArrow: '<button type="button" class="slick-prev"><span class="icon-arrow-left"></span></button>',
+            nextArrow: '<button type="button" class="slick-next"><span class="icon-arrow-right"></span></button>'
+        });
+    },
+    methods: {
+        scrollDown: function scrollDown(element) {
+            jQuery('body').animate({
+                scrollTop: jQuery('.' + element).offset().top
+            }, 'slow');
+        }
+    }
+});
+
+module.exports = slider;
+
+},{"jquery":1,"slick-carousel":3,"vue":6}],12:[function(require,module,exports){
+'use strict';
+
+var Vue = require('vue');
+
+Vue.validator('email', function (val) {
+    return (/^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(val)
+    );
+});
+
+module.exports = Vue;
+
+},{"vue":6}],13:[function(require,module,exports){
 'use strict';
 
 var jQuery = require('jquery');
@@ -19733,7 +24998,7 @@ var FormManager = {
 
 module.exports = FormManager;
 
-},{"jquery":1}],9:[function(require,module,exports){
+},{"jquery":1}],14:[function(require,module,exports){
 'use strict';
 
 var jQuery = require('jquery');
@@ -19750,6 +25015,95 @@ var Manager = {
 
 module.exports = Manager;
 
-},{"jquery":1}]},{},[5]);
+},{"jquery":1}],15:[function(require,module,exports){
+'use strict';
+
+var jQuery = require('jquery');
+
+var Instagram = {
+    data: {},
+    getFeed: function getFeed(callback) {
+        var self = this;
+        jQuery.getJSON('/feeds/instagram.json', function (result) {
+            self.data = result;
+            callback(self.getData());
+        }).error(function (error) {
+            console.log(error);
+        });
+    },
+    getData: function getData() {
+        return this.data;
+    }
+
+};
+
+module.exports = Instagram;
+
+},{"jquery":1}],16:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+   value: true
+});
+var form = require('../components/form');
+
+exports['default'] = {
+   template: '#contactpage'
+};
+module.exports = exports['default'];
+
+},{"../components/form":8}],17:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+   value: true
+});
+var slider = require('../components/slider');
+var instagram = require('../components/instagram');
+
+exports['default'] = {
+   template: '#homepage'
+};
+module.exports = exports['default'];
+
+},{"../components/instagram":9,"../components/slider":11}],18:[function(require,module,exports){
+'use strict';
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+// Import pages
+
+var _pagesHomepage = require('./pages/homepage');
+
+var _pagesHomepage2 = _interopRequireDefault(_pagesHomepage);
+
+var _pagesContactpage = require('./pages/contactpage');
+
+var _pagesContactpage2 = _interopRequireDefault(_pagesContactpage);
+
+var Vue = require('vue');
+var VueRouter = require('vue-router');
+
+Vue.use(VueRouter);
+
+var router = new VueRouter();
+
+router.map({
+    '/': {
+        name: 'home',
+        component: _pagesHomepage2['default']
+    },
+    '/contact': {
+        name: 'contact',
+        component: _pagesContactpage2['default']
+    }
+});
+
+var App = Vue.extend({});
+router.start(App, '#app');
+
+module.exports = router;
+
+},{"./pages/contactpage":16,"./pages/homepage":17,"vue":6,"vue-router":4}]},{},[7]);
 
 //# sourceMappingURL=app.js.map

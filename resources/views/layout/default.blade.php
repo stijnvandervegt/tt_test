@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html>
     @include('common.head')
-    <body class="contact">
-        @include('parts.header')
-            @yield('body')
+    <body  id="app">
+        <div class="wrapper">
+            @include('parts.header')
+                <div class="content">
+                    @yield('body')
+                </div>
+        </div>
         @include('parts.footer')
     </body>
     @include('common.foot')

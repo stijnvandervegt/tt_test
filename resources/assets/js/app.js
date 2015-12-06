@@ -1,10 +1,8 @@
 
 var Vue = require('vue');
 var Manager = require('./managers/init');
+var Nav = require('./components/nav');
 
 Manager.setup();
 
-//Vue.config.debug = true;
-var nav = require('./components/nav');
-var form = require('./components/form');
-
+var router = require('./router');
