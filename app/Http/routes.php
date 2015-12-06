@@ -11,9 +11,7 @@
 |
 */
 
-
-Route::post('/contact/form/send', ['uses' => 'FormController@contactForm', 'as' => 'sendContactForm']);
-
-
 Route::get('/', ['uses' => 'PageController@home', 'as' => 'home']);
-Route::get('/contact', ['uses' => 'PageController@contact', 'as' => 'contact']);
+
+Route::get('/instagram/feed', ['uses' => 'InstagramController@fetchData', 'as' => 'fetchData']);
+Route::post('/contact/form/send', ['uses' => 'FormController@contactForm', 'as' => 'sendContactForm']);
