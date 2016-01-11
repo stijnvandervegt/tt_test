@@ -10,6 +10,6 @@
     "slick-carousel": "^1.5.9",
     "vue": "^1.0.10",
     "vue-router": "^0.7.7",
-    "vue-validator": "^1.4.4"
+    "vue-validator": "^2.0.0-alpha.5"
   }
 }
